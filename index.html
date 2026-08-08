@@ -1,0 +1,3466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Health Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body { background: #09090b; margin: 0; }
+</style>
+
+<!-- Import map: resolves the bare "react" / "lucide-react" / "papaparse" specifiers
+     used in the compiled code below to real CDN modules with real network access. -->
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18",
+    "react/jsx-runtime": "https://esm.sh/react@18/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.383.0?external=react",
+    "papaparse": "https://esm.sh/papaparse@5?bundle"
+  }
+}
+</script>
+
+<!-- window.storage polyfill: makes claude.ai's artifact storage calls work against
+     this browser's localStorage instead, so the component logic didn't need to change.
+     NOTE: this is per-browser/per-device storage — see the chat for the plan to replace
+     this with a shared backend (Google Apps Script) so data syncs across devices. -->
+<script>
+  window.storage = {
+    async get(key) {
+      const raw = localStorage.getItem("health-dash:" + key);
+      if (raw === null) throw new Error("not found");
+      return { key, value: raw, shared: false };
+    },
+    async set(key, value) {
+      localStorage.setItem("health-dash:" + key, value);
+      return { key, value, shared: false };
+    },
+    async delete(key) {
+      localStorage.removeItem("health-dash:" + key);
+      return { key, deleted: true, shared: false };
+    },
+    async list(prefix) {
+      const keys = Object.keys(localStorage)
+        .filter((k) => k.startsWith("health-dash:" + (prefix || "")))
+        .map((k) => k.replace("health-dash:", ""));
+      return { keys, prefix, shared: false };
+    },
+  };
+</script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Pre-compiled from the JSX source (Babel run ahead of time, not in your browser). -->
+<script type="module">
+import React from "react";
+import ReactDOM from "react-dom/client";
+
+import { useState, useMemo, useEffect } from "react";
+import Papa from "papaparse";
+import { Home, Dumbbell, Apple, TrendingUp, Moon, Zap, Scale, Percent, Activity, RefreshCw, Check, Plus, X, Footprints, Heart, BatteryCharging, Wind, AlertCircle } from "lucide-react";
+
+// Paste your published Google Sheet CSV link here (File → Share → Publish to web → CSV).
+// The dashboard reads the LAST row of this sheet as the most recent sync.
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfpLXkeC_6BtP3zOuwvtNe4CId2VnjhMuUR-4pYWR1sz7t1G2rbyLOc_VJxBqsD5vsaZGahcF1AE9z/pub?gid=0&single=true&output=csv";
+
+// ---- Design tokens ----
+// Background: zinc-950 / zinc-900 (near-black, lets accents read as signal, not decoration)
+// Accent A (Workout / energy):  lime-400
+// Accent B (Nutrition / fuel):  orange-500
+// Accent C (Recovery / vitals): cyan-400
+// Stat numbers set in font-mono to read like a tracker display; labels in uppercase tracking-wide
+
+const TABS = [{
+  id: "overview",
+  label: "Overview",
+  icon: Home
+}, {
+  id: "workout",
+  label: "Workout",
+  icon: Dumbbell
+}, {
+  id: "nutrition",
+  label: "Nutrition",
+  icon: Apple
+}, {
+  id: "sleep",
+  label: "Sleep",
+  icon: Moon
+}, {
+  id: "trends",
+  label: "Trends",
+  icon: TrendingUp
+}];
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+// Fetches the published CSV, parses it, and returns the last (most recent) row as an object
+// keyed by column header. Throws with a human-readable message on failure.
+async function fetchLatestSheetRow() {
+  if (!SHEET_CSV_URL || SHEET_CSV_URL.includes("PASTE_YOUR")) {
+    throw new Error("Sheet URL not set yet — paste your published CSV link into SHEET_CSV_URL.");
+  }
+  const res = await fetch(SHEET_CSV_URL);
+  if (!res.ok) throw new Error(`Sheet fetch failed (${res.status}) — check the link is published and public.`);
+  const csvText = await res.text();
+  const parsed = Papa.parse(csvText, {
+    header: true,
+    skipEmptyLines: true
+  });
+  const rows = parsed.data;
+  if (!rows.length) throw new Error("Sheet is empty — no synced rows yet.");
+  return rows[rows.length - 1];
+}
+const SYSTEMS = {
+  A: {
+    name: "GuerillaZen ISP",
+    type: "weekly",
+    schedule: {
+      Mon: "push",
+      Tue: "pull",
+      Wed: "lower",
+      Thu: "activeRest",
+      Fri: "isolationUpper",
+      Sat: "gluteLower",
+      Sun: "rest"
+    },
+    workouts: {
+      push: {
+        title: "Push",
+        exercises: [{
+          name: "Band Pull Aparts",
+          sets: "2 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Single Arm Dumbbell Bench Press",
+          sets: "6 x 10",
+          rest: "45-60 sec (interset pec stretch 30 sec)"
+        }, {
+          name: "Single Arm Cable Overhead Press",
+          sets: "6 x 10",
+          rest: "45-60 sec"
+        }, {
+          name: "Seated Dumbbell Lateral Raise (45°)",
+          sets: "6 x 10",
+          rest: "45-60 sec"
+        }, {
+          name: "Isometric Push Up Hold (push neck back)",
+          sets: "6 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "Resistance Band Face Pull (squeeze shoulder blade)",
+          sets: "2 x 50",
+          rest: "60 sec"
+        }, {
+          name: "HIIT",
+          sets: "6 x 30 sec",
+          rest: "60-300 sec"
+        }, {
+          name: "Cable Wood Chop (Obliques)",
+          sets: "5 x 15",
+          rest: "30 sec"
+        }]
+      },
+      pull: {
+        title: "Pull",
+        exercises: [{
+          name: "Quadruped Flow (squeeze shoulder blades)",
+          sets: "3 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Resistance Band Shoulder Pull (Circle)",
+          sets: "2 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Single Arm Dumbbell Row",
+          sets: "6 x 10",
+          rest: "60 sec (interset lat stretch 30 sec)"
+        }, {
+          name: "Single Arm Lat Pulldown",
+          sets: "6 x 10",
+          rest: "60 sec (interset lat stretch 30 sec)"
+        }, {
+          name: "Farmer's Walk",
+          sets: "5 x 30 sec",
+          rest: "60 sec"
+        }, {
+          name: "Reverse Cable Wood Chops",
+          sets: "5 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Planks",
+          sets: "5 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "HIIT",
+          sets: "6 x 30 sec",
+          rest: "60-300 sec"
+        }]
+      },
+      lower: {
+        title: "Lower Body",
+        exercises: [{
+          name: "Hip Hinge Movement",
+          sets: "1 x 100",
+          rest: "—"
+        }, {
+          name: "Diagonal Walk w/ Knee Band",
+          sets: "4 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Single Leg Deadlift (DB opposite hand)",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Bulgarian Split Squats",
+          sets: "5 x 10",
+          rest: "60 sec"
+        }, {
+          name: "Alternate Walking Lunges w/ Dumbbell",
+          sets: "5 x 10",
+          rest: "60 sec"
+        }, {
+          name: "Bodyweight Squats",
+          sets: "4 x 20",
+          rest: "60 sec"
+        }, {
+          name: "Overhead Squat Hold (superset w/ BW Squats)",
+          sets: "4 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "Stability Ball Crunches",
+          sets: "5 x 20",
+          rest: "30 sec"
+        }, {
+          name: "Palloff Press",
+          sets: "4 x 15",
+          rest: "30 sec"
+        }]
+      },
+      isolationUpper: {
+        title: "Isolation Focused Upper Body",
+        exercises: [{
+          name: "Wall Press",
+          sets: "2 x 15",
+          rest: "30 sec"
+        }, {
+          name: "Wide Grip Row",
+          sets: "5 x 12 each",
+          rest: "45 sec"
+        }, {
+          name: "Pushups",
+          sets: "5 x 20",
+          rest: "45 sec"
+        }, {
+          name: "Seated Dumbbell Overhead Reverse Shrugs",
+          sets: "5 x 10",
+          rest: "30 sec"
+        }, {
+          name: "Concentration Curls",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Seated Alternating Incline Hammer Curls",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Decline Dumbbell Triceps Extensions",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Single Arm Cable Tricep Extensions",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Banded Lateral Raise Burnout",
+          sets: "4 x AMRAP",
+          rest: "60 sec"
+        }, {
+          name: "Planks",
+          sets: "5 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "Forearm Grips",
+          sets: "2 x 50",
+          rest: "30 sec"
+        }]
+      },
+      gluteLower: {
+        title: "Glute-centric Lower Body",
+        exercises: [{
+          name: "Cable Pull Throughs",
+          sets: "5 x 20",
+          rest: "30 sec"
+        }, {
+          name: "Hip Thrusters",
+          sets: "5 x 20",
+          rest: "30 sec"
+        }, {
+          name: "Reverse Lunges",
+          sets: "5 x 10",
+          rest: "45 sec"
+        }, {
+          name: "Box Step Ups",
+          sets: "5 x 10",
+          rest: "60 sec"
+        }, {
+          name: "Wall Sits",
+          sets: "4 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "Isometric Bird Dogs",
+          sets: "4 x 30 sec",
+          rest: "30 sec"
+        }, {
+          name: "HIIT",
+          sets: "6 x 30 sec",
+          rest: "60-300 sec"
+        }]
+      },
+      activeRest: {
+        title: "Active Rest",
+        note: "Light movement — walk, mobility, or easy cardio. No structured lifting today."
+      },
+      rest: {
+        title: "Rest",
+        note: "Full rest day."
+      }
+    }
+  },
+  B: {
+    name: "Theory of Motion",
+    type: "rotation",
+    order: ["D1", "D2", "D3", "D4"],
+    workouts: {
+      D1: {
+        title: "Lower Body — Squat Focus",
+        sections: [{
+          name: "Warm Up",
+          exercises: [{
+            name: "T-Spine Flexion ISO Diaphragmatic Breathing",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Spiderman Lunge with Rotation",
+            sets: "1 x 4 each side",
+            rest: "—"
+          }, {
+            name: "Foam Roller T-Spine Extensions",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Heels Elevated Toe Touch Squat ISO",
+            sets: "1 x 5",
+            rest: "0 sec"
+          }]
+        }, {
+          name: "Prehab",
+          exercises: [{
+            name: "Deep Squat Calf Raises",
+            sets: "2 x 10",
+            rest: "—"
+          }, {
+            name: "Seated L-Sit Leg Raise – Compressed",
+            sets: "2 x 8-10 each @ 9 RPE",
+            rest: "—"
+          }]
+        }, {
+          name: "Power Development",
+          exercises: [{
+            name: "Staggered Stance Rotational Box Jump",
+            sets: "3 x 4 each @ 7 RPE",
+            rest: "30 sec"
+          }]
+        }, {
+          name: "Strength Superset 1",
+          exercises: [{
+            name: "BB High Bar Back Squat",
+            sets: "4 x 8 @ 7 RPE",
+            rest: "—"
+          }, {
+            name: "Supported SL Bent Runner Calf Raise ISO",
+            sets: "3 x 20-30 sec each @ 9 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 2",
+          exercises: [{
+            name: "BB Hip Thrust",
+            sets: "3 x 12 @ 7 RPE",
+            rest: "—"
+          }, {
+            name: "1KB Goblet Deficit Staggered Squat",
+            sets: "3 x 8 each @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 3",
+          exercises: [{
+            name: "Supported Sissy Squat",
+            sets: "3 x 5-6 @ 8-9 RPE",
+            rest: "—"
+          }, {
+            name: "Reverse Crunch off Bench",
+            sets: "3 x 8-12 @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Timed Core Finisher (6:40, 4 rounds)",
+          exercises: [{
+            name: "Hollow Hold Level 2 Pullover",
+            sets: "20 sec @ 8 RPE",
+            rest: "5 sec"
+          }, {
+            name: "Posterior Plank Marching",
+            sets: "20 sec @ 8 RPE",
+            rest: "5 sec"
+          }, {
+            name: "Cross Body Jackknife",
+            sets: "20 sec @ 8 RPE",
+            rest: "30 sec"
+          }]
+        }, {
+          name: "Cool Down",
+          exercises: [{
+            name: "Roll to Straddle",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Glute Bridge w/ Alternating Diagonal Overhead Reaches",
+            sets: "1 x 6 each",
+            rest: "—"
+          }, {
+            name: "Spiderman with ER ISO Hold",
+            sets: "40 sec each",
+            rest: "—"
+          }]
+        }]
+      },
+      D2: {
+        title: "Upper Body — Bench Focus",
+        sections: [{
+          name: "Warm Up",
+          exercises: [{
+            name: "T-Spine Flexion ISO Diaphragmatic Breathing",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Spiderman Lunge with Rotation",
+            sets: "1 x 4 each side",
+            rest: "—"
+          }, {
+            name: "Foam Roller T-Spine Extensions",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Heels Elevated Toe Touch Squat ISO",
+            sets: "1 x 5",
+            rest: "0 sec"
+          }]
+        }, {
+          name: "Prehab",
+          exercises: [{
+            name: "Standing 90/90 Band/Cable External Rotation",
+            sets: "2 x 10 each @ 9 RPE",
+            rest: "—"
+          }, {
+            name: "Standing Halo",
+            sets: "2 x 8 each @ 8 RPE",
+            rest: "—"
+          }]
+        }, {
+          name: "Power Development",
+          exercises: [{
+            name: "1DB Single Arm Hang to Overhead",
+            sets: "3 x 6 each @ 7 RPE",
+            rest: "45 sec"
+          }]
+        }, {
+          name: "Strength Superset 1",
+          exercises: [{
+            name: "BB Bench Press",
+            sets: "4 x 6 @ 7 RPE",
+            rest: "—"
+          }, {
+            name: "2DB Seated Reverse Flye – Pronated",
+            sets: "3 x 10 @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 2",
+          exercises: [{
+            name: "Single Arm DB Bench Supported Row",
+            sets: "3 x 10 each @ 8 RPE",
+            rest: "—"
+          }, {
+            name: "2DB Tall Kneeling Alt. Arnold Press",
+            sets: "3 x 8 each @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 3",
+          exercises: [{
+            name: "Weight Plate Front Raise",
+            sets: "3 x 10 @ 9 RPE",
+            rest: "—"
+          }, {
+            name: "Single Arm DB Preacher Hammer Curl",
+            sets: "3 x 10 each @ 9 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Cardio Finisher (6 min, 6 rounds)",
+          exercises: [{
+            name: "Cardio Modality of Choice",
+            sets: "10 sec max effort",
+            rest: "50 sec easy"
+          }]
+        }, {
+          name: "Cool Down",
+          exercises: [{
+            name: "Cobra to Neck Rotations",
+            sets: "1 x 8 each",
+            rest: "—"
+          }, {
+            name: "Crab Stretch",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Band Lat Stretch",
+            sets: "45 sec each",
+            rest: "—"
+          }]
+        }]
+      },
+      D3: {
+        title: "Lower Body — Deadlift Focus",
+        sections: [{
+          name: "Warm Up",
+          exercises: [{
+            name: "T-Spine Flexion ISO Diaphragmatic Breathing",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Spiderman Lunge with Rotation",
+            sets: "1 x 4 each side",
+            rest: "—"
+          }, {
+            name: "Foam Roller T-Spine Extensions",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Heels Elevated Toe Touch Squat ISO",
+            sets: "1 x 5",
+            rest: "0 sec"
+          }]
+        }, {
+          name: "Prehab",
+          exercises: [{
+            name: "Split Squat with Band RNT",
+            sets: "2 x 10 each",
+            rest: "—"
+          }, {
+            name: "Side Plank Series",
+            sets: "2 x 30 sec each @ 9 RPE",
+            rest: "—"
+          }]
+        }, {
+          name: "Power Development",
+          exercises: [{
+            name: "KB Swings",
+            sets: "3 x 8 @ 7 RPE",
+            rest: "30 sec"
+          }]
+        }, {
+          name: "Strength Superset 1",
+          exercises: [{
+            name: "BB Conventional Deadlift",
+            sets: "4 x 4 @ 7 RPE",
+            rest: "—"
+          }, {
+            name: "Copenhagen Plank – Short Lever",
+            sets: "3 x 20-30 sec each @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 2",
+          exercises: [{
+            name: "Rear Foot Elevated Split Squat (single arm KB)",
+            sets: "3 x 8 each @ 8 RPE",
+            rest: "—"
+          }, {
+            name: "Stability Ball Hamstring Curl Series",
+            sets: "3 x 10 @ 9 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 3",
+          exercises: [{
+            name: "1DB Goblet Curtsy Lunge",
+            sets: "3 x 8 each @ 8 RPE",
+            rest: "—"
+          }, {
+            name: "Band/Cable Bent Over Horizontal Chop",
+            sets: "3 x 8 each @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Athletic Finisher (6 min, 4 rounds)",
+          exercises: [{
+            name: "Pogo Hops On To Plate",
+            sets: "15 sec",
+            rest: "5 sec"
+          }, {
+            name: "Lateral Plate Pogo Hops (alt. side each round)",
+            sets: "15 sec",
+            rest: "5 sec"
+          }, {
+            name: "Plate Toe Taps",
+            sets: "15 sec",
+            rest: "5 sec"
+          }, {
+            name: "Deficit Reverse Lunge off Plate to Knee Drive",
+            sets: "15 sec",
+            rest: "15 sec"
+          }]
+        }, {
+          name: "Cool Down",
+          exercises: [{
+            name: "Roll to Straddle",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Glute Bridge w/ Alternating Diagonal Overhead Reaches",
+            sets: "1 x 6 each",
+            rest: "—"
+          }, {
+            name: "Spiderman with ER ISO Hold",
+            sets: "40 sec each",
+            rest: "—"
+          }]
+        }]
+      },
+      D4: {
+        title: "Upper Body — Overhead Press Focus",
+        sections: [{
+          name: "Warm Up",
+          exercises: [{
+            name: "T-Spine Flexion ISO Diaphragmatic Breathing",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Spiderman Lunge with Rotation",
+            sets: "1 x 4 each side",
+            rest: "—"
+          }, {
+            name: "Foam Roller T-Spine Extensions",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Heels Elevated Toe Touch Squat ISO",
+            sets: "1 x 5",
+            rest: "0 sec"
+          }]
+        }, {
+          name: "Prehab",
+          exercises: [{
+            name: "Wall Supported Hip Flexion to SL Deadlift",
+            sets: "2 x 8 each",
+            rest: "—"
+          }, {
+            name: "Crunch ISO w/ Heel Touches",
+            sets: "2 x 10-15 each @ 9 RPE",
+            rest: "—"
+          }]
+        }, {
+          name: "Power Development",
+          exercises: [{
+            name: "Forward Pogo Hops",
+            sets: "3 x 10-15",
+            rest: "45 sec"
+          }]
+        }, {
+          name: "Strength Superset 1",
+          exercises: [{
+            name: "BB Military Press",
+            sets: "4 x 5 @ 7 RPE",
+            rest: "—"
+          }, {
+            name: "Band/Cable Seated Pronated High Row",
+            sets: "3 x 10 @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 2",
+          exercises: [{
+            name: "Pushup",
+            sets: "3 x 6 @ 8 RPE",
+            rest: "—"
+          }, {
+            name: "Lat Pulldown",
+            sets: "3 x 8 @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Strength Superset 3",
+          exercises: [{
+            name: "2DB Incline Curl",
+            sets: "3 x 12 @ 9 RPE",
+            rest: "—"
+          }, {
+            name: "Standing Single Arm Band/Cable Upright Triceps Kickback",
+            sets: "3 x 12 each @ 8 RPE",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Complex Finisher (3 rounds)",
+          exercises: [{
+            name: "1KB/1DB Complex: Clean & Press, Offset Squat, Offset Reverse Lunge, Single Arm Swing",
+            sets: "3x each @ 9 RPE",
+            rest: "60-90 sec"
+          }]
+        }, {
+          name: "Cool Down",
+          exercises: [{
+            name: "Cobra to Neck Rotations",
+            sets: "1 x 8 each",
+            rest: "—"
+          }, {
+            name: "Crab Stretch",
+            sets: "1 x 8",
+            rest: "—"
+          }, {
+            name: "Band Lat Stretch",
+            sets: "45 sec each",
+            rest: "—"
+          }]
+        }]
+      }
+    }
+  },
+  C: {
+    name: "Kris Gethin's Hardcore (DTP)",
+    type: "numbered",
+    maxDay: 56,
+    workouts: {
+      1: {
+        title: "Quads, Lower Abs & Calves",
+        cardio: "20 min AM / 20 min PM",
+        sections: [{
+          name: "Quads",
+          exercises: [{
+            name: "Hack Squat",
+            sets: "3 x 15",
+            rest: "90 sec · 1.5 rep variation"
+          }, {
+            name: "Squat Press",
+            sets: "3 x 15",
+            rest: "90 sec · 2-sec pause reps"
+          }, {
+            name: "3a. Leg Extension",
+            sets: "10/10/10",
+            rest: "drop set, 10 sec between drops"
+          }, {
+            name: "3b. Walking Lunges",
+            sets: "10",
+            rest: "—"
+          }, {
+            name: "3c. Body Weight Squats",
+            sets: "10",
+            rest: "—"
+          }, {
+            name: "3d. Walking Lunges",
+            sets: "10",
+            rest: "2 sets total (giant set)"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Calf Raise",
+            sets: "5 x 30",
+            rest: "90 sec"
+          }]
+        }, {
+          name: "Lower Abs",
+          exercises: [{
+            name: "5a. Hanging Leg Raises",
+            sets: "Failure",
+            rest: "—"
+          }, {
+            name: "5b. Lying Leg Raises",
+            sets: "Failure",
+            rest: "3 sets, superset"
+          }]
+        }]
+      },
+      2: {
+        title: "Chest & Shoulders",
+        cardio: "20 min AM / 20 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Dumbbell Chest Press (DTPXtreme)",
+            sets: "3 x 10/10/10",
+            rest: "triple dropset, 10 sec between drops"
+          }, {
+            name: "2a. Incline Cable Fly",
+            sets: "3 x 12",
+            rest: "2-sec pause on sets 2-3"
+          }, {
+            name: "2b. Dumbbell Floor Press",
+            sets: "3 x 12",
+            rest: "45 sec between supersets"
+          }, {
+            name: "3a. Decline Dumbbell Fly",
+            sets: "3 x 12",
+            rest: "2-sec pause on sets 2-3"
+          }, {
+            name: "3b. Pushups",
+            sets: "Failure",
+            rest: "—"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "4a. Smith Machine Alternating Military Press",
+            sets: "3 x 12",
+            rest: "alternate front/behind-head"
+          }, {
+            name: "4b. Lying Upright Cable Rows",
+            sets: "3 x 12",
+            rest: "—"
+          }, {
+            name: "5a. Lying Cable Side Raise",
+            sets: "3 x 12",
+            rest: "60 sec between supersets"
+          }, {
+            name: "5b. Lying Cable Front Raise",
+            sets: "3 x 12",
+            rest: "—"
+          }, {
+            name: "6a. Bent-Over Cable Rear Delt Raise",
+            sets: "3 x 10",
+            rest: "60 sec between supersets"
+          }, {
+            name: "6b. Standing Rope Pulls",
+            sets: "3 x 10",
+            rest: "focus pulling rope apart"
+          }]
+        }]
+      },
+      3: {
+        title: "Arms",
+        cardio: "20 min AM / 20 min PM",
+        sections: [{
+          name: "Triceps",
+          exercises: [{
+            name: "1a. Reverse-Grip Cable Tricep Pushdown",
+            sets: "3 x 12",
+            rest: "—"
+          }, {
+            name: "1b. Cable Overhead Tricep Extension",
+            sets: "3 x 12",
+            rest: "—"
+          }, {
+            name: "2a. Single-Arm Overhead Rope Extensions",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "2b. Single-Arm Rope Kickbacks",
+            sets: "3 x 10",
+            rest: "45 sec between supersets"
+          }, {
+            name: "3a. Close-Grip Pushups",
+            sets: "Failure",
+            rest: "drop to knees at failure, extra set"
+          }, {
+            name: "3b. Elevated Bench Dips",
+            sets: "Failure",
+            rest: "—"
+          }]
+        }, {
+          name: "Biceps",
+          exercises: [{
+            name: "4a. EZ-Bar Spider Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "4b. Standing EZ-Bar Curls (narrow grip)",
+            sets: "3 x 10",
+            rest: "60 sec between supersets"
+          }, {
+            name: "5a. Reverse-Grip Dumbbell Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "5b. Hammer Curls",
+            sets: "3 x 10",
+            rest: "60 sec between supersets"
+          }, {
+            name: "6a. Lying Cable Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "6b. Standing Alternating Cable Curls",
+            sets: "3 x 10-12",
+            rest: "varied tempo set 2, 2-sec pause set 3"
+          }]
+        }]
+      },
+      4: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "20 min AM / 20 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "Deadlifts",
+            sets: "3 x 10",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "2a. Seated Hamstring Curls",
+            sets: "3 x 10",
+            rest: "triple drop on final set"
+          }, {
+            name: "2b. Glute Ham Raises",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "Stiff-Legged Cable Deadlifts",
+            sets: "3 x 10",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "4a. Decline Cross-Body Situp",
+            sets: "Failure",
+            rest: "—"
+          }, {
+            name: "4b. Conventional Cross-Body Situp",
+            sets: "Failure",
+            rest: "add alternating twist for obliques"
+          }]
+        }]
+      },
+      5: {
+        title: "Upper Back & Calves",
+        cardio: "20 min AM / 20 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Lat Pulldown",
+            sets: "3 x 10",
+            rest: "60 sec · vinyl handles on straight-bar"
+          }, {
+            name: "2a. Pullups",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "2b. Rope Lat Pulldowns",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "3a. Single-Arm Dumbbell Row",
+            sets: "3 x 10 each arm",
+            rest: "—"
+          }, {
+            name: "3b. Single-Arm Inverted Row",
+            sets: "3 x 10 each arm",
+            rest: "—"
+          }, {
+            name: "4a. Dumbbell Pullovers",
+            sets: "3 x 15",
+            rest: "—"
+          }, {
+            name: "4b. Standing Dumbbell Shrugs",
+            sets: "3 x 15",
+            rest: "—"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Standing Calf Press",
+            sets: "5 x 20",
+            rest: "60 sec"
+          }]
+        }]
+      },
+      6: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      7: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      8: {
+        title: "Legs, Lower Abs & Calves",
+        cardio: "25 min AM / 25 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "Leg Extension",
+            sets: "3 x 20,10,20",
+            rest: "45 sec between sets, drop set"
+          }, {
+            name: "Leg Press",
+            sets: "5 x 30,20,10,20,30",
+            rest: "60 sec"
+          }, {
+            name: "Alternating Barbell Lunge & Squat Combo",
+            sets: "3 x 10",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Calf Raises",
+            sets: "5 x 30,20,10,20,30",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Lower Abs",
+          exercises: [{
+            name: "5a. Lying Incline Leg Raises",
+            sets: "3 x 15",
+            rest: "—"
+          }, {
+            name: "5b. Exercise Ball Knee Tuck",
+            sets: "3 x 20",
+            rest: "—"
+          }, {
+            name: "5c. Bodyweight Plank",
+            sets: "3 x 30 sec hold",
+            rest: "circuit"
+          }]
+        }]
+      },
+      9: {
+        title: "Chest & Shoulders",
+        cardio: "25 min AM / 25 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Hammer Press",
+            sets: "3 x 20,15,10/10",
+            rest: "45 sec between sets, drop set"
+          }, {
+            name: "Incline Smith Machine Press",
+            sets: "3 x 20,10,10/10",
+            rest: "drop set on set 3"
+          }, {
+            name: "Seated Cable Fly",
+            sets: "3 x 20,15,10/10",
+            rest: "drop set on set 3"
+          }, {
+            name: "Wide-Hands Pushup",
+            sets: "Failure",
+            rest: "banded to failure, then bodyweight"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Barbell Front Raise & Shoulder Press Combo",
+            sets: "3 x 10",
+            rest: "90 sec"
+          }, {
+            name: "Barbell Side Raises",
+            sets: "3 x 10/10",
+            rest: "banded drop sets, 10 each arm"
+          }, {
+            name: "Dumbbell Rear Delt Fly",
+            sets: "3 x 20",
+            rest: "banded to failure finish"
+          }]
+        }]
+      },
+      10: {
+        title: "Arms",
+        cardio: "25 min AM / 25 min PM",
+        sections: [{
+          name: "Triceps",
+          exercises: [{
+            name: "Overhead Triceps Extensions",
+            sets: "3 x 15",
+            rest: "60 sec · band to failure on set 3"
+          }, {
+            name: "Seated Rope Extensions",
+            sets: "3 x 10/10/10",
+            rest: "triple drop set"
+          }, {
+            name: "Dips",
+            sets: "3 x 10",
+            rest: "—"
+          }]
+        }, {
+          name: "Biceps",
+          exercises: [{
+            name: "4a. EZ-Bar Spider Curls",
+            sets: "3 x 10-12",
+            rest: "—"
+          }, {
+            name: "4b. Standing Banded Biceps Curl",
+            sets: "3 x 10-12",
+            rest: "—"
+          }, {
+            name: "5a. Low Cable EZ-Bar Curls",
+            sets: "3 x 10-12",
+            rest: "—"
+          }, {
+            name: "5b. Low Banded Biceps Curl",
+            sets: "3 x 8-10",
+            rest: "60 sec between supersets"
+          }, {
+            name: "6a. Incline Dumbbell Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "6b. Seated Banded Biceps Curl",
+            sets: "3 x 10",
+            rest: "60 sec between supersets"
+          }]
+        }]
+      },
+      11: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "25 min AM / 25 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "Deadlifts",
+            sets: "5, 5/5, 8/8",
+            rest: "progressive drop sets"
+          }, {
+            name: "2a. Rack Deadlifts",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "2b. Banded Good Mornings",
+            sets: "3 x 20",
+            rest: "—"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "Lying Hamstring Curl",
+            sets: "20, 10/10, 10/10/10",
+            rest: "60 sec · progressive drop sets"
+          }, {
+            name: "Standing Cable Hamstring Curl",
+            sets: "3 x 20,15,10 each leg",
+            rest: "no rest between sets"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "5a. Barbell Straight-Arm Situps",
+            sets: "3 x 10",
+            rest: "60 sec between circuits"
+          }, {
+            name: "5b. Barbell Rollouts",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "5c. Crunches",
+            sets: "3 x 10",
+            rest: "last 2 circuits: alternating oblique"
+          }]
+        }]
+      },
+      12: {
+        title: "Upper Back & Calves",
+        cardio: "25 min AM / 25 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Pull-ups",
+            sets: "3 x 10/10",
+            rest: "banded then bodyweight"
+          }, {
+            name: "Hammer Row",
+            sets: "3 x 10/10",
+            rest: "banded then bodyweight"
+          }, {
+            name: "Supported Smith Machine Row",
+            sets: "3 x 10/10",
+            rest: "90 sec · drop sets"
+          }, {
+            name: "4a. Cable Straight-Arm Pulldown",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "4b. High-Pulley Cable Row",
+            sets: "3 x 10",
+            rest: "90 sec between supersets"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Single-Leg Standing Dumbbell Calf Raise",
+            sets: "5 x 30,25,20,20,20",
+            rest: "last 2 sets bodyweight only"
+          }]
+        }]
+      },
+      13: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      14: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      15: {
+        title: "Legs, Calves & Lower Abs",
+        cardio: "30 min AM / 30 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "Leg Extension",
+            sets: "25/25, then 5 x 10",
+            rest: "drop set + pyramid to 50 reps"
+          }, {
+            name: "2a. Landmine Squat",
+            sets: "3 x 25",
+            rest: "no rest between supersets"
+          }, {
+            name: "2b. Hex Bar Squat",
+            sets: "3 x 25",
+            rest: "—"
+          }, {
+            name: "Bulgarian Split Squat",
+            sets: "3 x 20 each leg",
+            rest: "rest-pause + tempo finish"
+          }, {
+            name: "Smith Machine Front Squat",
+            sets: "3 x 20",
+            rest: "90 sec"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Calf Raises",
+            sets: "5 x 30",
+            rest: "60 sec"
+          }]
+        }, {
+          name: "Lower Abs",
+          exercises: [{
+            name: "6a. Captain's Chair Leg Raises",
+            sets: "3 x 20",
+            rest: "—"
+          }, {
+            name: "6b. Medicine Ball Pass",
+            sets: "Failure",
+            rest: "—"
+          }, {
+            name: "6c. Cross-body Mountain Climbers",
+            sets: "Failure",
+            rest: "circuit"
+          }]
+        }]
+      },
+      16: {
+        title: "Chest & Shoulders",
+        cardio: "30 min AM / 30 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Incline Dumbbell Fly & Press Combo",
+            sets: "3 x 20",
+            rest: "combo move, 2 reps per rep count"
+          }, {
+            name: "2a. Incline Close-grip Dumbbell Press",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "2b. Incline Dumbbell Press",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "3a. Rollout Fly",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "3b. Pushups",
+            sets: "3 x 10",
+            rest: "immediately after rollout flys"
+          }, {
+            name: "Smith Machine Weighted Pushups (Incline/Decline)",
+            sets: "3 x 20",
+            rest: "then bodyweight only"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Smith Machine Close-Grip Press",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }, {
+            name: "Squat Press Shoulder Press",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }, {
+            name: "Single-Arm Landmine Shoulder Press",
+            sets: "3 x 20 each arm",
+            rest: "—"
+          }, {
+            name: "8a. Single-Arm Bentover Rear Delt Raise",
+            sets: "3 x 10-12",
+            rest: "—"
+          }, {
+            name: "8b. Single-Arm Rear Delt Raise (side)",
+            sets: "3 x 10-12",
+            rest: "with resistance band"
+          }]
+        }]
+      },
+      17: {
+        title: "Arms",
+        cardio: "30 min AM / 30 min PM",
+        sections: [{
+          name: "Triceps",
+          exercises: [{
+            name: "Kneeling Cable Overhead Triceps Extension",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }, {
+            name: "Machine Triceps Extension",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }, {
+            name: "Machine Triceps Pressdown",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }]
+        }, {
+          name: "Biceps",
+          exercises: [{
+            name: "4a. Standing Cable Curls",
+            sets: "3 x 10",
+            rest: "vinyl handles"
+          }, {
+            name: "4b. Lying Cable Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "5a. Lying High Cable Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "5b. Standing High Cable Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "6a. Reverse-Grip EZ-Bar Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "6b. Close-Grip EZ-Bar Curls",
+            sets: "3 x 10",
+            rest: "—"
+          }]
+        }]
+      },
+      18: {
+        title: "Hamstrings, Lower Back & Upper Abs",
+        cardio: "30 min AM / 30 min PM",
+        sections: [{
+          name: "Hamstrings",
+          exercises: [{
+            name: "Single-Leg Hamstring Curl",
+            sets: "5 x 12,10,8,8,6 each leg",
+            rest: "no rest between sets"
+          }, {
+            name: "Dumbbell Stiff-Legged Deadlift",
+            sets: "5 x 10",
+            rest: "—"
+          }]
+        }, {
+          name: "Lower Back",
+          exercises: [{
+            name: "Weighted Hyperextensions",
+            sets: "3 x 10/10",
+            rest: "drop to bodyweight"
+          }, {
+            name: "Barbell Good Mornings",
+            sets: "3 x 20,18,16",
+            rest: "pyramid, increasing weight"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "5a. Weighted Crunches",
+            sets: "3 x 20",
+            rest: "45 sec between circuits"
+          }, {
+            name: "5b. Cross-Body Crunches",
+            sets: "3 x 20",
+            rest: "—"
+          }, {
+            name: "5c. Exercise Ball Rollouts",
+            sets: "3 x 20",
+            rest: "—"
+          }, {
+            name: "5d. Ab Twists",
+            sets: "3 x 50",
+            rest: "—"
+          }]
+        }]
+      },
+      19: {
+        title: "Upper Back & Calves",
+        cardio: "30 min AM / 30 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Dumbbell Seal Row",
+            sets: "3 x 10/10",
+            rest: "drop sets"
+          }, {
+            name: "Incline Straight-Arm Pullover",
+            sets: "3 x 12",
+            rest: "—"
+          }, {
+            name: "Barbell Bentover Row",
+            sets: "3 x 10",
+            rest: "—"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "4a. Seated EZ-Bar Shrugs",
+            sets: "3 x 20",
+            rest: "—"
+          }, {
+            name: "4b. Calf Press",
+            sets: "5 x 20",
+            rest: "2 extra calf sets after supersets"
+          }]
+        }]
+      },
+      20: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      21: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      22: {
+        title: "Legs, Calves & Lower Abs",
+        cardio: "35 min AM / 35 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "Single-Leg Extension",
+            sets: "5 x 15,15,15,12,6 each leg",
+            rest: "no rest between sets"
+          }, {
+            name: "Single-Leg Press",
+            sets: "5 x 15,15,15,12,6 each leg",
+            rest: "—"
+          }, {
+            name: "Single-Leg Hack Squat",
+            sets: "5 x 10 each leg",
+            rest: "drop set to 50 reps each leg"
+          }, {
+            name: "Dumbbell Lunge",
+            sets: "5 x 10 each leg",
+            rest: "drop set to 50 reps each leg"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Single-Leg Calf Raise",
+            sets: "5 x 20 each leg",
+            rest: "no rest between sets"
+          }]
+        }, {
+          name: "Lower Abs",
+          exercises: [{
+            name: "6a. Alternating Hanging Leg Raises",
+            sets: "3 x 10 each leg",
+            rest: "30 sec between sets"
+          }, {
+            name: "6b. Alternating Lying Leg Raises",
+            sets: "3 x 10",
+            rest: "—"
+          }, {
+            name: "6c. Alternating Exercise Ball Knee Tucks",
+            sets: "3 x 10",
+            rest: "circuit"
+          }]
+        }]
+      },
+      23: {
+        title: "Chest & Shoulders",
+        cardio: "35 min AM / 35 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Incline One-Arm Dumbbell Press",
+            sets: "4 x 15,15,15,5",
+            rest: "drop 3 sets, 2-3 min, then heavy set of 5"
+          }, {
+            name: "Incline Unilateral Cable Crossover",
+            sets: "4 x 15,15,15,5",
+            rest: "same scheme"
+          }, {
+            name: "Decline Unilateral Dumbbell Press",
+            sets: "4 x 15,15,15,5",
+            rest: "same scheme"
+          }, {
+            name: "One-Arm Cable Crossover",
+            sets: "4 x 15,15,15,5",
+            rest: "same scheme"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Standing One-Arm Shoulder Press",
+            sets: "4 x 10,10,10,5",
+            rest: "same scheme"
+          }, {
+            name: "One-Arm Cable Rear Delt Fly",
+            sets: "4 x 10,10,10,5",
+            rest: "same scheme"
+          }, {
+            name: "One-Arm Lying Cable Front Raises",
+            sets: "4 x 10,10,10,5",
+            rest: "same scheme"
+          }, {
+            name: "One-Arm Cable Side Raises",
+            sets: "4 x 10,10,10,5",
+            rest: "same scheme"
+          }]
+        }]
+      },
+      24: {
+        title: "Arms",
+        cardio: "35 min AM / 35 min PM",
+        sections: [{
+          name: "Biceps and Triceps",
+          exercises: [{
+            name: "1a. Seated Single-Arm Dumbbell Curls",
+            sets: "4 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "1b. Lying Single-Arm Overhead Dumbbell Extension",
+            sets: "4 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "2a. Incline Single-Arm Overhead Cable Extensions",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "2b. Single-Arm Cable Concentration Curls",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "3a. Single-Arm Preacher Machine Curls",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "3b. Single-Arm Cable Push-downs",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }]
+        }]
+      },
+      25: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "35 min AM / 35 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "Single-Arm Dumbbell Deadlift",
+            sets: "3 x 15",
+            rest: "no rest between sets, reduce weight each set"
+          }, {
+            name: "Hyperextensions",
+            sets: "3 x 15",
+            rest: "reduce weight each set"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "Single-Leg Hamstring Curl",
+            sets: "3 x 15",
+            rest: "reduce weight each set"
+          }, {
+            name: "Cable Single-Leg Stiff-Legged Deadlift",
+            sets: "3 x 15",
+            rest: "reduce weight each set"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "5a. Dumbbell Weighted Crunches",
+            sets: "15 each side, 3 circuits/side",
+            rest: "60 sec between circuits"
+          }, {
+            name: "5b. Cable Cross-Body Pulls",
+            sets: "15 each side",
+            rest: "—"
+          }, {
+            name: "5c. Crunches",
+            sets: "15 each side",
+            rest: "—"
+          }]
+        }]
+      },
+      26: {
+        title: "Upper Back & Calves",
+        cardio: "35 min AM / 35 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Single-Arm Barbell Row",
+            sets: "3 x 15 each arm",
+            rest: "no rest between sets, reduce weight"
+          }, {
+            name: "Single-Arm Cable Rows",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "Single-Arm Smith Machine Shrugs",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }, {
+            name: "Single-Arm Overhead Machine Pulldowns",
+            sets: "3 x 15 each arm",
+            rest: "—"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Single-Leg Calf Press",
+            sets: "5 x 15 each leg",
+            rest: "—"
+          }]
+        }]
+      },
+      27: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      28: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      29: {
+        title: "Quads, Calves & Lower Abs",
+        cardio: "40 min AM / 40 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "Leg Extensions (DTPXtreme)",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "rest = reps completed in sec; 2 min after set 3"
+          }, {
+            name: "2a. Hack Squats (narrow stance)",
+            sets: "3 x 30,25,20",
+            rest: "30 sec after 1st superset"
+          }, {
+            name: "2b. Reverse Hack Squats (narrow stance)",
+            sets: "3 x 20,25,30",
+            rest: "25 sec after 2nd superset"
+          }, {
+            name: "Leg Press (DTPXtreme)",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "same DTPXtreme scheme"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Calf Raises (DTPXtreme)",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "same DTPXtreme scheme"
+          }]
+        }, {
+          name: "Lower Abs",
+          exercises: [{
+            name: "5a. Hanging Windshield Wipers",
+            sets: "Failure",
+            rest: "60 sec between supersets"
+          }, {
+            name: "5b. Lying Windshield Wipers",
+            sets: "Failure",
+            rest: "—"
+          }]
+        }]
+      },
+      30: {
+        title: "Chest & Shoulders",
+        cardio: "40 min AM / 40 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Incline Dumbbell Press",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }, {
+            name: "Decline Dumbbell Press",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }, {
+            name: "Flat Chest Press Machine",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Front Plate Raises",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }, {
+            name: "Bent-Over Reverse Plate Flyes",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }, {
+            name: "Side Lateral Plate Raises",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "DTPXtreme scheme"
+          }]
+        }]
+      },
+      31: {
+        title: "Arms",
+        cardio: "40 min AM / 40 min PM",
+        sections: [{
+          name: "Arms",
+          exercises: [{
+            name: "1a. Triceps Extensions",
+            sets: "6 x 30,25,20,20,25,30",
+            rest: "—"
+          }, {
+            name: "1b. Dumbbell Biceps Curl",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "—"
+          }, {
+            name: "2a. EZ Bar Skull Crushers",
+            sets: "6 x 30,25,20,20,25,30",
+            rest: "—"
+          }, {
+            name: "2b. Cable EZ Bar Preacher Curls",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "—"
+          }, {
+            name: "3a. Dips",
+            sets: "6 x 30,25,20,20,25,30",
+            rest: "—"
+          }, {
+            name: "3b. Hammer Curls",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "—"
+          }]
+        }]
+      },
+      32: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "40 min AM / 40 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "Deadlifts",
+            sets: "6 x 15,10,5,5,10,15",
+            rest: "DTPXtreme scheme"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "Lying Leg Curls (single leg)",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "—"
+          }, {
+            name: "Seated Leg Curls",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "—"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "4a. Standing Cable Crunches",
+            sets: "5 x 30",
+            rest: "60 sec between supersets"
+          }, {
+            name: "4b. Exercise Ball Alternating Crunches",
+            sets: "5 x 30",
+            rest: "—"
+          }]
+        }]
+      },
+      33: {
+        title: "Upper Back & Calves",
+        cardio: "40 min AM / 40 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Pull-ups",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "wide grip first 3, narrow grip last 3"
+          }, {
+            name: "T-Bar Rows",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "—"
+          }, {
+            name: "Seated Machine Row",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "wide grip first 3, narrow grip last 3"
+          }, {
+            name: "4a. Machine Shrugs",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "—"
+          }, {
+            name: "4b. Calf Raise Machine",
+            sets: "6 x 30,20,10,10,20,30",
+            rest: "—"
+          }]
+        }]
+      },
+      34: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      35: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      36: {
+        title: "Quads & Calves",
+        cardio: "45 min AM / 45 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "Leg Extensions",
+            sets: "3 x 20,15,10",
+            rest: "45 sec between sets"
+          }, {
+            name: "Squats",
+            sets: "3 x 20,25,30",
+            rest: "60 sec between sets"
+          }, {
+            name: "Leg Press",
+            sets: "3 x 20,15,10",
+            rest: "60 sec between sets"
+          }, {
+            name: "Hack Squats",
+            sets: "3 x 20,15,10",
+            rest: "60 sec between sets"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Seated Calf Raises",
+            sets: "6 x 30,25,20,10,15,20",
+            rest: "variable rest 10-60 sec by set"
+          }]
+        }]
+      },
+      37: {
+        title: "Chest & Shoulders",
+        cardio: "45 min AM / 45 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Flat Dumbbell Press",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Incline Dumbbell Flyes",
+            sets: "3 x 10,15,20",
+            rest: "10/15 sec by set"
+          }, {
+            name: "Decline Smith Machine Press",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Cable Crossover",
+            sets: "4 x 10,15,20,30",
+            rest: "10/15/20 sec by set"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Incline Front Barbell Raises",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Incline Front Dumbbell Raises",
+            sets: "3 x 10,15,20",
+            rest: "10/15 sec by set"
+          }, {
+            name: "Incline Rear Delt Flyes",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Incline Bench Rear Dumbbell Flyes",
+            sets: "3 x 10,15,20",
+            rest: "10/15 sec by set"
+          }, {
+            name: "Dumbbell Lateral Raise",
+            sets: "3 x 30,20,10",
+            rest: "—"
+          }, {
+            name: "Seated Side Lateral Dumbbell Raises",
+            sets: "3 x 10,15,20",
+            rest: "10/15 sec by set"
+          }]
+        }]
+      },
+      38: {
+        title: "Arms",
+        cardio: "45 min AM / 45 min PM",
+        sections: [{
+          name: "Arms",
+          exercises: [{
+            name: "Machine Preacher Curls",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Rope Pressdown",
+            sets: "3 x 10,15,20",
+            rest: "10/15 sec by set"
+          }, {
+            name: "Reverse-Grip Triceps Extensions",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Reverse-Grip Cable Biceps Curl",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }, {
+            name: "Smith Machine Drag Curl",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Smith Machine Close-Grip Bench Press",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }, {
+            name: "Incline Overhead Dumbbell Extensions",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Spider Curls",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }]
+        }]
+      },
+      39: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "45 min AM / 45 min PM",
+        sections: [{
+          name: "Hamstrings",
+          exercises: [{
+            name: "Glute-Ham Raise",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Seated Leg Curls",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }, {
+            name: "Lying Cable Hamstring Curl",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Reverse Hack Squat",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }]
+        }, {
+          name: "Lower Back",
+          exercises: [{
+            name: "Hyperextensions",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Dumbbell Deadlifts",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "7a. Exercise Ball Cable Crunches",
+            sets: "Failure",
+            rest: "no rest between sets"
+          }, {
+            name: "7b. Ab Wheel Rollouts",
+            sets: "Failure",
+            rest: "—"
+          }]
+        }]
+      },
+      40: {
+        title: "Upper Back & Calves",
+        cardio: "45 min AM / 45 min PM",
+        sections: [{
+          name: "Upper Back",
+          exercises: [{
+            name: "Machine Pullover",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Straight-Arm Dumbbell Pullover",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }, {
+            name: "Straight-Arm Pulldown",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Lat Pulldown",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }, {
+            name: "Machine Shrugs",
+            sets: "6 x 30,20,10,20,25,30",
+            rest: "variable rest by set"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Standing Calf Raise",
+            sets: "3 x 30,20,10",
+            rest: "30/20 sec by set"
+          }, {
+            name: "Donkey Calf Raises",
+            sets: "3 x 20,25,30",
+            rest: "20/25 sec by set"
+          }]
+        }]
+      },
+      41: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      42: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      43: {
+        title: "Quads, Calves & Lower Abs",
+        cardio: "50 min AM / 50 min PM",
+        sections: [{
+          name: "Legs",
+          exercises: [{
+            name: "1a. Leg Extensions",
+            sets: "3 x 20,15,10",
+            rest: "40 sec (1st superset)"
+          }, {
+            name: "1b. Seated Leg Press",
+            sets: "3 x 20,15,10",
+            rest: "30 sec (2nd superset)"
+          }, {
+            name: "2a. Hack Squat",
+            sets: "3 x 20,15,10",
+            rest: "40 sec (1st superset)"
+          }, {
+            name: "2b. Barbell Squat",
+            sets: "3 x 20,15,10",
+            rest: "30 sec (2nd superset)"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "3a. Seated Calf Raises",
+            sets: "3 x 20,25,30",
+            rest: "20 sec between supersets"
+          }, {
+            name: "3b. Flat Bench Lying Leg Raise",
+            sets: "Failure",
+            rest: "—"
+          }]
+        }]
+      },
+      44: {
+        title: "Chest & Shoulders",
+        cardio: "50 min AM / 50 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "1a. Incline Dumbbell Fly",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "1b. Decline Dumbbell Press",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "40 sec (1st superset)"
+          }, {
+            name: "2a. Machine Seated Chest Press",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "2b. Pec Deck Fly",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "30 sec (2nd superset)"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "3a. Upright Row",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "3b. Front Dumbbell Raises",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "2 min (3rd superset)"
+          }, {
+            name: "4a. Smith Machine Behind-the-Neck Press",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "4b. Seated Lateral Raise",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "20 sec (4th superset)"
+          }]
+        }]
+      },
+      45: {
+        title: "Arms",
+        cardio: "50 min AM / 50 min PM",
+        sections: [{
+          name: "Arms",
+          exercises: [{
+            name: "1a. Cable Triceps Extension",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "1b. Cable Biceps Curl",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "40 sec (1st superset)"
+          }, {
+            name: "2a. Overhead Machine Triceps Extension",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "2b. Machine Preacher Curl",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "30 sec (2nd superset)"
+          }, {
+            name: "3a. Standing EZ-Bar Curl",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "3b. Bench Dip",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "2 min (3rd superset)"
+          }]
+        }]
+      },
+      46: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "50 min AM / 50 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "1a. Machine Deadlifts",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "1b. Hyperextension",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "40 sec (1st superset)"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "2a. Lying Hamstring Curl",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "2b. Stiff-Legged Deadlift",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "30 sec (2nd superset)"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "3a. Banded Crunches (to failure, then iso hold)",
+            sets: "Failure",
+            rest: "no rest, 6 rounds back-to-back"
+          }, {
+            name: "3b. Dumbbell Crunches (to failure, then iso hold)",
+            sets: "Failure",
+            rest: "45 sec between circuits"
+          }]
+        }]
+      },
+      47: {
+        title: "Back & Calves",
+        cardio: "50 min AM / 50 min PM",
+        sections: [{
+          name: "Back",
+          exercises: [{
+            name: "1a. Lat Pulldown",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "1b. Seated Machine Row",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "40 sec (1st superset)"
+          }, {
+            name: "2a. Bent-Over Row",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "alternate start exercise every 3 supersets"
+          }, {
+            name: "2b. Behind-the-Neck Pulldown",
+            sets: "6 x 20,15,10,10,15,20",
+            rest: "30 sec (2nd superset)"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Calf Press",
+            sets: "3 x 20,15,10",
+            rest: "20 sec between sets"
+          }, {
+            name: "Smith Machine Standing Calf Raises",
+            sets: "3 x 20,15,10",
+            rest: "10 sec after set 1, 15 sec after set 2"
+          }]
+        }]
+      },
+      48: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      49: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      50: {
+        title: "Quads, Calves & Lower Abs",
+        cardio: "55 min AM / 55 min PM",
+        sections: [{
+          name: "Quads",
+          exercises: [{
+            name: "Hack Squats",
+            sets: "5 x 10,15,20,25,30",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Leg Press",
+            sets: "5 x 30,25,20,15,10",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }, {
+          name: "Calves & Lower Abs",
+          exercises: [{
+            name: "3a. Seated Calf Raises",
+            sets: "5 x 30,25,20,15,10",
+            rest: "60→50→40→30 sec by superset"
+          }, {
+            name: "3b. Decline Lying Leg Raises",
+            sets: "5 x 30,25,20,15,10",
+            rest: "alternating twist at top"
+          }, {
+            name: "4a. Decline Lying Leg Raises",
+            sets: "5 x 10,15,20,25,30",
+            rest: "20→30→40→50 sec by superset"
+          }, {
+            name: "4b. Seated Calf Raises",
+            sets: "5 x 10,15,20,25,30",
+            rest: "—"
+          }]
+        }]
+      },
+      51: {
+        title: "Chest & Shoulders",
+        cardio: "55 min AM / 55 min PM",
+        sections: [{
+          name: "Chest",
+          exercises: [{
+            name: "Incline Dumbbell Fly & Press Combo",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Decline Dumbbell Fly & Press Combo",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }, {
+          name: "Shoulders",
+          exercises: [{
+            name: "Front Dumbbell Raise & Press Combo",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Incline Rear Delt Raises",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }]
+      },
+      52: {
+        title: "Arms",
+        cardio: "55 min AM / 55 min PM",
+        sections: [{
+          name: "Arms",
+          exercises: [{
+            name: "Cable Incline Triceps Extension (rope)",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Decline Barbell Triceps Extension",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }, {
+            name: "High-Pulley Cable Curls",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Seated Dumbbell Curls",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }]
+      },
+      53: {
+        title: "Lower Back, Hamstrings & Upper Abs",
+        cardio: "55 min AM / 55 min PM",
+        sections: [{
+          name: "Lower Back",
+          exercises: [{
+            name: "Rack Deadlifts",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Seated Cable Deadlift",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }, {
+          name: "Hamstrings",
+          exercises: [{
+            name: "Single-Leg Hamstring Curl",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Sissy Squats",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }, {
+          name: "Upper Abs",
+          exercises: [{
+            name: "Ab Crunch Machine",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Decline Situp",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }]
+      },
+      54: {
+        title: "Upper Back & Calves",
+        cardio: "55 min AM / 55 min PM",
+        sections: [{
+          name: "Back",
+          exercises: [{
+            name: "Incline Dumbbell Rows",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Bentover Dumbbell Row",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }, {
+            name: "Wide-Grip Lat Pulldown",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Rope Lat Pulldown",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }, {
+          name: "Calves",
+          exercises: [{
+            name: "Calf Press (hack squat machine)",
+            sets: "5 x 30,25,20,15,10",
+            rest: "30→25→20→15 sec by set"
+          }, {
+            name: "Standing Calf Raises (facing hack squat)",
+            sets: "5 x 10,15,20,25,30",
+            rest: "10→15→20→25 sec by set"
+          }]
+        }]
+      },
+      55: {
+        title: "Rest",
+        note: "Rest day."
+      },
+      56: {
+        title: "Rest",
+        note: "Rest day."
+      }
+    }
+  }
+};
+function useMonthGrid(workoutLogDates) {
+  return useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // Nutrition logging by date isn't wired up yet — only workout logging is, via
+    // workoutLogDates (keyed by real YYYY-MM-DD, filled in from the Workout tab's Log button).
+    const cells = [];
+    for (let i = 0; i < startOffset; i++) cells.push(null);
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${year}-${String(month + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      cells.push({
+        day: d,
+        isToday: d === today.getDate(),
+        workoutLogged: !!workoutLogDates?.[dateKey],
+        nutritionLogged: false
+      });
+    }
+    return {
+      cells,
+      monthLabel: today.toLocaleString("default", {
+        month: "long",
+        year: "numeric"
+      })
+    };
+  }, [workoutLogDates]);
+}
+function Tile({
+  icon: Icon,
+  label,
+  value,
+  unit,
+  accent
+}) {
+  const accentText = {
+    lime: "text-lime-400",
+    orange: "text-orange-500",
+    cyan: "text-cyan-400"
+  }[accent];
+  const accentBg = {
+    lime: "bg-lime-400/10",
+    orange: "bg-orange-500/10",
+    cyan: "bg-cyan-400/10"
+  }[accent];
+  return /*#__PURE__*/_jsxs("div", {
+    className: "bg-zinc-900 rounded-xl p-4 flex flex-col gap-3 border border-zinc-800",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "flex items-center justify-between",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-[11px] uppercase tracking-wide text-zinc-500 font-medium",
+        children: label
+      }), /*#__PURE__*/_jsx("div", {
+        className: `${accentBg} rounded-lg p-1.5`,
+        children: /*#__PURE__*/_jsx(Icon, {
+          className: `w-3.5 h-3.5 ${accentText}`
+        })
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "flex items-baseline gap-1",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "font-mono text-3xl font-bold text-zinc-50",
+        children: value
+      }), unit && /*#__PURE__*/_jsx("span", {
+        className: "text-sm text-zinc-500",
+        children: unit
+      })]
+    })]
+  });
+}
+function ManualEntryForm({
+  stats,
+  onSave,
+  onCancel
+}) {
+  const [weight, setWeight] = useState(stats.weight);
+  const [bodyFat, setBodyFat] = useState(stats.bodyFat);
+  const [muscle, setMuscle] = useState(stats.muscle);
+  const fields = [{
+    key: "weight",
+    label: "Weight (kg)",
+    value: weight,
+    set: setWeight
+  }, {
+    key: "bodyFat",
+    label: "Body Fat (%)",
+    value: bodyFat,
+    set: setBodyFat
+  }, {
+    key: "muscle",
+    label: "Skeletal Muscle (kg)",
+    value: muscle,
+    set: setMuscle
+  }];
+  return /*#__PURE__*/_jsxs("div", {
+    className: "bg-zinc-900 rounded-xl p-4 border border-orange-500/30 flex flex-col gap-3",
+    children: [/*#__PURE__*/_jsx("div", {
+      className: "grid grid-cols-3 gap-3",
+      children: fields.map(f => /*#__PURE__*/_jsxs("label", {
+        className: "flex flex-col gap-1",
+        children: [/*#__PURE__*/_jsx("span", {
+          className: "text-[11px] uppercase tracking-wide text-zinc-500",
+          children: f.label
+        }), /*#__PURE__*/_jsx("input", {
+          type: "number",
+          step: "0.1",
+          value: f.value,
+          onChange: e => f.set(e.target.value),
+          className: "bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 text-sm font-mono text-zinc-50 focus:outline-none focus:border-orange-500"
+        })]
+      }, f.key))
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "flex gap-2",
+      children: [/*#__PURE__*/_jsxs("button", {
+        onClick: () => onSave({
+          weight,
+          bodyFat,
+          muscle
+        }),
+        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-zinc-950 hover:bg-orange-400 transition-colors",
+        children: [/*#__PURE__*/_jsx(Check, {
+          className: "w-3.5 h-3.5"
+        }), " Save"]
+      }), /*#__PURE__*/_jsxs("button", {
+        onClick: onCancel,
+        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors",
+        children: [/*#__PURE__*/_jsx(X, {
+          className: "w-3.5 h-3.5"
+        }), " Cancel"]
+      })]
+    })]
+  });
+}
+function OverviewTab({
+  sleepScore,
+  stressScore,
+  stats,
+  setStats,
+  workoutLogDates
+}) {
+  const {
+    cells,
+    monthLabel
+  } = useMonthGrid(workoutLogDates);
+  const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const [showForm, setShowForm] = useState(false);
+  const [selectedDay, setSelectedDay] = useState(null);
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex flex-col gap-6",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "grid grid-cols-2 sm:grid-cols-5 gap-3",
+      children: [/*#__PURE__*/_jsx(Tile, {
+        icon: Moon,
+        label: "Sleep Score",
+        value: sleepScore ?? "—",
+        accent: "cyan"
+      }), /*#__PURE__*/_jsx(Tile, {
+        icon: Zap,
+        label: "Stress Score",
+        value: stressScore ?? "—",
+        accent: "cyan"
+      }), /*#__PURE__*/_jsx(Tile, {
+        icon: Scale,
+        label: "Weight",
+        value: stats.weight || "—",
+        unit: stats.weight ? "kg" : "",
+        accent: "orange"
+      }), /*#__PURE__*/_jsx(Tile, {
+        icon: Percent,
+        label: "Body Fat",
+        value: stats.bodyFat || "—",
+        unit: stats.bodyFat ? "%" : "",
+        accent: "orange"
+      }), /*#__PURE__*/_jsx(Tile, {
+        icon: Activity,
+        label: "Skeletal Muscle",
+        value: stats.muscle || "—",
+        unit: stats.muscle ? "kg" : "",
+        accent: "orange"
+      })]
+    }), showForm ? /*#__PURE__*/_jsx(ManualEntryForm, {
+      stats: stats,
+      onSave: next => {
+        setStats(next);
+        setShowForm(false);
+      },
+      onCancel: () => setShowForm(false)
+    }) : /*#__PURE__*/_jsxs("button", {
+      onClick: () => setShowForm(true),
+      className: "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500/20 transition-colors",
+      children: [/*#__PURE__*/_jsx(Plus, {
+        className: "w-4 h-4"
+      }), " Log weight & body composition"]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+      children: [/*#__PURE__*/_jsxs("div", {
+        className: "flex items-center justify-between mb-4",
+        children: [/*#__PURE__*/_jsx("h3", {
+          className: "text-sm font-semibold text-zinc-200",
+          children: monthLabel
+        }), /*#__PURE__*/_jsxs("div", {
+          className: "flex items-center gap-4 text-[11px] text-zinc-500",
+          children: [/*#__PURE__*/_jsxs("span", {
+            className: "flex items-center gap-1.5",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: "w-2 h-2 rounded-full bg-lime-400 inline-block"
+            }), " Workout"]
+          }), /*#__PURE__*/_jsxs("span", {
+            className: "flex items-center gap-1.5",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: "w-2 h-2 rounded-full bg-orange-500 inline-block"
+            }), " Nutrition"]
+          })]
+        })]
+      }), /*#__PURE__*/_jsx("div", {
+        className: "grid grid-cols-7 gap-1.5 mb-2",
+        children: weekdayLabels.map((w, i) => /*#__PURE__*/_jsx("div", {
+          className: "text-center text-[10px] text-zinc-600 font-medium",
+          children: w
+        }, i))
+      }), /*#__PURE__*/_jsx("div", {
+        className: "grid grid-cols-7 gap-1.5",
+        children: cells.map((cell, i) => cell === null ? /*#__PURE__*/_jsx("div", {}, i) : /*#__PURE__*/_jsxs("button", {
+          onClick: () => setSelectedDay(selectedDay === cell.day ? null : cell.day),
+          className: `aspect-square rounded-lg flex flex-col items-center justify-center gap-1 border transition-colors ${selectedDay === cell.day ? "border-cyan-400 bg-zinc-800" : cell.isToday ? "border-zinc-500 bg-zinc-800" : "border-zinc-800/60 bg-zinc-950 hover:border-zinc-700"}`,
+          children: [/*#__PURE__*/_jsx("span", {
+            className: `text-xs ${cell.isToday || selectedDay === cell.day ? "text-zinc-50 font-bold" : "text-zinc-400"}`,
+            children: cell.day
+          }), /*#__PURE__*/_jsxs("span", {
+            className: "flex gap-0.5",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: `w-1.5 h-1.5 rounded-full ${cell.workoutLogged ? "bg-lime-400" : "bg-zinc-800"}`
+            }), /*#__PURE__*/_jsx("span", {
+              className: `w-1.5 h-1.5 rounded-full ${cell.nutritionLogged ? "bg-orange-500" : "bg-zinc-800"}`
+            })]
+          })]
+        }, i))
+      }), selectedDay !== null && (() => {
+        const cell = cells.find(c => c && c.day === selectedDay);
+        if (!cell) return null;
+        return /*#__PURE__*/_jsxs("div", {
+          className: "mt-4 pt-4 border-t border-zinc-800",
+          children: [/*#__PURE__*/_jsxs("span", {
+            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            children: [monthLabel.split(" ")[0], " ", cell.day]
+          }), /*#__PURE__*/_jsxs("div", {
+            className: "flex flex-col gap-2 mt-2",
+            children: [/*#__PURE__*/_jsxs("div", {
+              className: "flex items-center gap-2.5",
+              children: [/*#__PURE__*/_jsx("span", {
+                className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.workoutLogged ? "bg-lime-400" : "bg-zinc-800"}`
+              }), /*#__PURE__*/_jsx("span", {
+                className: "text-sm text-zinc-300",
+                children: cell.workoutLogged ? "Workout logged" : "No workout logged"
+              })]
+            }), /*#__PURE__*/_jsxs("div", {
+              className: "flex items-center gap-2.5",
+              children: [/*#__PURE__*/_jsx("span", {
+                className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.nutritionLogged ? "bg-orange-500" : "bg-zinc-800"}`
+              }), /*#__PURE__*/_jsx("span", {
+                className: "text-sm text-zinc-300",
+                children: cell.nutritionLogged ? "Nutrition logged" : "No nutrition logged"
+              })]
+            })]
+          })]
+        });
+      })()]
+    })]
+  });
+}
+const WEEK_ORDER = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+function ExerciseRow({
+  ex
+}) {
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex items-center justify-between py-2.5 gap-3",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "flex flex-col",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-sm text-zinc-200",
+        children: ex.name
+      }), /*#__PURE__*/_jsxs("span", {
+        className: "text-[11px] text-zinc-500",
+        children: ["Rest ", ex.rest]
+      })]
+    }), /*#__PURE__*/_jsx("span", {
+      className: "font-mono text-sm text-lime-400 flex-shrink-0 text-right",
+      children: ex.sets
+    })]
+  });
+}
+function WorkoutBody({
+  workout
+}) {
+  if (workout.note) {
+    return /*#__PURE__*/_jsx("p", {
+      className: "text-sm text-zinc-500",
+      children: workout.note
+    });
+  }
+  const cardioLine = workout.cardio ? /*#__PURE__*/_jsxs("div", {
+    className: "text-[11px] text-cyan-400 mb-3",
+    children: ["Cardio: ", workout.cardio]
+  }) : null;
+  if (workout.sections) {
+    return /*#__PURE__*/_jsxs("div", {
+      children: [cardioLine, /*#__PURE__*/_jsx("div", {
+        className: "flex flex-col gap-4",
+        children: workout.sections.map((sec, i) => /*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("span", {
+            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            children: sec.name
+          }), /*#__PURE__*/_jsx("div", {
+            className: "flex flex-col divide-y divide-zinc-800/70 mt-1",
+            children: sec.exercises.map((ex, j) => /*#__PURE__*/_jsx(ExerciseRow, {
+              ex: ex
+            }, j))
+          })]
+        }, i))
+      })]
+    });
+  }
+  return /*#__PURE__*/_jsxs("div", {
+    children: [cardioLine, /*#__PURE__*/_jsx("div", {
+      className: "flex flex-col divide-y divide-zinc-800/70",
+      children: workout.exercises.map((ex, i) => /*#__PURE__*/_jsx(ExerciseRow, {
+        ex: ex
+      }, i))
+    })]
+  });
+}
+function WorkoutTab({
+  loggedByDay,
+  setLoggedByDay,
+  onLogToday
+}) {
+  const [system, setSystem] = useState("A");
+  const [expandedDay, setExpandedDay] = useState(null);
+  const todayName = DAY_NAMES[new Date().getDay()];
+  const sys = SYSTEMS[system];
+  const dayList = !sys ? [] : sys.type === "weekly" ? WEEK_ORDER : sys.type === "rotation" ? sys.order : Array.from({
+    length: sys.maxDay
+  }, (_, i) => i + 1);
+  const toggleLog = day => {
+    const newValue = !loggedByDay[system]?.[day];
+    setLoggedByDay(prev => ({
+      ...prev,
+      [system]: {
+        ...prev[system],
+        [day]: newValue
+      }
+    }));
+    // Logging a workout always means "I did this today" — reflect that on the Overview calendar.
+    if (onLogToday) onLogToday(newValue);
+  };
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex flex-col gap-6",
+    children: [/*#__PURE__*/_jsx("div", {
+      className: "grid grid-cols-3 gap-3",
+      children: ["A", "B", "C"].map(id => {
+        const s = SYSTEMS[id];
+        return /*#__PURE__*/_jsxs("button", {
+          onClick: () => {
+            setSystem(id);
+            setExpandedDay(null);
+          },
+          className: `rounded-xl p-3 text-left border transition-colors ${system === id ? "bg-lime-400/10 border-lime-400 text-lime-400" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"}`,
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "text-sm font-semibold",
+            children: s ? s.name : `System ${id}`
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-600 mt-0.5",
+            children: s ? "" : "Upload this system's data next"
+          })]
+        }, id);
+      })
+    }), !sys ? /*#__PURE__*/_jsx("div", {
+      className: "bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-sm text-zinc-500",
+      children: "No data yet for this system \u2014 upload it and I'll wire it in the same way as Systems A and B."
+    }) : /*#__PURE__*/_jsx("div", {
+      className: "flex flex-col gap-2",
+      children: dayList.map(day => {
+        const dayKey = sys.type === "weekly" ? sys.schedule[day] : day;
+        const workout = sys.workouts[dayKey];
+        const isToday = sys.type === "weekly" && day === todayName;
+        const isExpanded = expandedDay === day;
+        const isLogged = !!loggedByDay[system]?.[day];
+        const isRestLike = !workout.exercises && !workout.sections;
+        return /*#__PURE__*/_jsxs("div", {
+          className: `bg-zinc-900 rounded-xl border overflow-hidden ${isToday ? "border-lime-400/50" : "border-zinc-800"}`,
+          children: [/*#__PURE__*/_jsxs("button", {
+            onClick: () => setExpandedDay(isExpanded ? null : day),
+            className: "w-full flex items-center justify-between px-4 py-3 text-left gap-3",
+            children: [/*#__PURE__*/_jsxs("div", {
+              className: "flex items-center gap-3 min-w-0",
+              children: [/*#__PURE__*/_jsx("span", {
+                className: `text-[11px] uppercase tracking-wide flex-shrink-0 ${isToday ? "text-lime-400 font-bold" : "text-zinc-500"}`,
+                children: sys.type === "numbered" ? `Day ${day}` : day
+              }), /*#__PURE__*/_jsx("span", {
+                className: "text-sm font-semibold text-zinc-200 truncate",
+                children: workout.title
+              })]
+            }), !isRestLike && /*#__PURE__*/_jsxs("button", {
+              onClick: e => {
+                e.stopPropagation();
+                toggleLog(day);
+              },
+              className: `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors ${isLogged ? "bg-lime-400/10 text-lime-400" : "bg-lime-400 text-zinc-950 hover:bg-lime-300"}`,
+              children: [isLogged ? /*#__PURE__*/_jsx(Check, {
+                className: "w-3.5 h-3.5"
+              }) : null, isLogged ? "Logged" : "Log"]
+            })]
+          }), isExpanded && /*#__PURE__*/_jsx("div", {
+            className: "px-4 pb-4",
+            children: /*#__PURE__*/_jsx(WorkoutBody, {
+              workout: workout
+            })
+          })]
+        }, day);
+      })
+    })]
+  });
+}
+function macroPct(item) {
+  const total = item.carbsPct + item.fatPct + item.proteinPct;
+  return total === 0 ? "" : `Carbs ${item.carbsPct}% Fat ${item.fatPct}% Protein ${item.proteinPct}%`;
+}
+function NutritionTab({
+  healthData,
+  syncing,
+  syncError,
+  onSync
+}) {
+  const remaining = {
+    carbs: healthData?.["Carbs Remaining"] ?? "—",
+    fat: healthData?.["Fat Remaining"] ?? "—",
+    protein: healthData?.["Protein Remaining"] ?? "—",
+    calories: healthData?.["Calories Remaining"] ?? "—"
+  };
+  const lastSynced = healthData ? `${healthData.Date || ""} ${healthData.Time || ""}`.trim() : null;
+
+  // Pulled live from MyFitnessPal (most recent completed diary day, Jul 20 — today's
+  // diary was still empty at fetch time).
+  const meals = [{
+    name: "Breakfast",
+    kcal: 658,
+    carbsPct: 37,
+    fatPct: 25,
+    proteinPct: 38,
+    items: [{
+      name: "Egg White",
+      subtitle: "Ntuc Egg, 5 Egg (50g)",
+      kcal: 130
+    }, {
+      name: "Fish Oil",
+      subtitle: "Carlson Very Finest Fish Oil, 2 Teaspoon",
+      kcal: 80
+    }, {
+      name: "Dates",
+      subtitle: "Ajwa, 2 date",
+      kcal: 46
+    }, {
+      name: "Whey Isolate",
+      subtitle: "Nutrabio, 1 Scoop",
+      kcal: 120
+    }, {
+      name: "Kaya Cheese Pancake",
+      subtitle: "Mr. Bean, 136 g",
+      kcal: 282
+    }]
+  }, {
+    name: "Lunch",
+    kcal: 430,
+    carbsPct: 32,
+    fatPct: 38,
+    proteinPct: 22,
+    items: [{
+      name: "Beef Shawarma",
+      subtitle: "wewa, 1 half pita",
+      kcal: 430
+    }]
+  }, {
+    name: "Dinner",
+    kcal: 483,
+    carbsPct: 9,
+    fatPct: 26,
+    proteinPct: 62,
+    items: [{
+      name: "Chicken Breast, Grilled, Skinless",
+      subtitle: "250 g",
+      kcal: 440
+    }, {
+      name: "Blueberries",
+      subtitle: "75 g",
+      kcal: 43
+    }]
+  }, {
+    name: "Snacks",
+    kcal: 160,
+    carbsPct: 80,
+    fatPct: 17,
+    proteinPct: 5,
+    items: [{
+      name: "Salted Caramel Cold Brew",
+      subtitle: "Coffee Bean & Tea Leaf, 12 oz",
+      kcal: 160
+    }]
+  }];
+
+  // No exercise entries were logged in MyFitnessPal for this day.
+  const exercise = [];
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex flex-col gap-4",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden",
+      children: [/*#__PURE__*/_jsxs("div", {
+        className: "flex items-center justify-between px-4 pt-3",
+        children: [/*#__PURE__*/_jsx("span", {
+          className: "text-sm font-semibold text-zinc-200",
+          children: "Nutrients Remaining"
+        }), /*#__PURE__*/_jsxs("button", {
+          onClick: onSync,
+          disabled: syncing,
+          className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500/20 transition-colors disabled:opacity-60",
+          children: [/*#__PURE__*/_jsx(RefreshCw, {
+            className: `w-3 h-3 ${syncing ? "animate-spin" : ""}`
+          }), syncing ? "Syncing…" : "Sync from Sheet"]
+        })]
+      }), lastSynced && !syncError && /*#__PURE__*/_jsxs("div", {
+        className: "px-4 text-[11px] text-zinc-600 mt-1",
+        children: ["Last synced: ", lastSynced]
+      }), syncError && /*#__PURE__*/_jsxs("div", {
+        className: "flex items-start gap-1.5 px-4 mt-1 text-[11px] text-red-400",
+        children: [/*#__PURE__*/_jsx(AlertCircle, {
+          className: "w-3.5 h-3.5 flex-shrink-0 mt-0.5"
+        }), " ", syncError]
+      }), /*#__PURE__*/_jsxs("div", {
+        className: "grid grid-cols-4 px-4 py-4 text-center",
+        children: [/*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "font-mono text-xl font-bold text-zinc-50",
+            children: remaining.carbs
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Carbs (g)"
+          })]
+        }), /*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "font-mono text-xl font-bold text-zinc-50",
+            children: remaining.fat
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Fat (g)"
+          })]
+        }), /*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "font-mono text-xl font-bold text-zinc-50",
+            children: remaining.protein
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Protein (g)"
+          })]
+        }), /*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "font-mono text-xl font-bold text-orange-500",
+            children: remaining.calories
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Calories"
+          })]
+        })]
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "flex flex-col gap-3",
+      children: [meals.map(m => /*#__PURE__*/_jsxs("div", {
+        className: "bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden",
+        children: [/*#__PURE__*/_jsxs("div", {
+          className: "px-4 pt-3 pb-2 border-b border-zinc-800/70",
+          children: [/*#__PURE__*/_jsxs("div", {
+            className: "flex items-center justify-between",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: "text-sm font-semibold text-zinc-200",
+              children: m.name
+            }), /*#__PURE__*/_jsx("span", {
+              className: "font-mono text-sm text-zinc-300",
+              children: m.kcal
+            })]
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500 mt-0.5",
+            children: macroPct(m)
+          })]
+        }), /*#__PURE__*/_jsx("div", {
+          className: "flex flex-col divide-y divide-zinc-800/70",
+          children: m.items.map((it, i) => /*#__PURE__*/_jsxs("div", {
+            className: "flex items-center justify-between px-4 py-2.5",
+            children: [/*#__PURE__*/_jsxs("div", {
+              className: "flex flex-col",
+              children: [/*#__PURE__*/_jsx("span", {
+                className: "text-sm text-zinc-200",
+                children: it.name
+              }), /*#__PURE__*/_jsx("span", {
+                className: "text-[11px] text-zinc-500",
+                children: it.subtitle
+              })]
+            }), /*#__PURE__*/_jsx("span", {
+              className: "font-mono text-sm text-zinc-400",
+              children: it.kcal
+            })]
+          }, i))
+        }), /*#__PURE__*/_jsxs("button", {
+          className: "flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-orange-500 hover:text-orange-400 transition-colors",
+          children: [/*#__PURE__*/_jsx(Plus, {
+            className: "w-3.5 h-3.5"
+          }), " Add Food"]
+        })]
+      }, m.name)), /*#__PURE__*/_jsxs("div", {
+        className: "bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden",
+        children: [/*#__PURE__*/_jsx("div", {
+          className: "px-4 pt-3 pb-2 border-b border-zinc-800/70",
+          children: /*#__PURE__*/_jsx("span", {
+            className: "text-sm font-semibold text-zinc-200",
+            children: "Exercise"
+          })
+        }), /*#__PURE__*/_jsx("div", {
+          className: "flex flex-col divide-y divide-zinc-800/70",
+          children: exercise.length === 0 ? /*#__PURE__*/_jsx("div", {
+            className: "px-4 py-2.5 text-sm text-zinc-500",
+            children: "No exercise logged"
+          }) : exercise.map((ex, i) => /*#__PURE__*/_jsxs("div", {
+            className: "flex items-center justify-between px-4 py-2.5",
+            children: [/*#__PURE__*/_jsxs("div", {
+              className: "flex items-center gap-2.5",
+              children: [/*#__PURE__*/_jsx(Footprints, {
+                className: "w-3.5 h-3.5 text-cyan-400 flex-shrink-0"
+              }), /*#__PURE__*/_jsxs("div", {
+                className: "flex flex-col",
+                children: [/*#__PURE__*/_jsx("span", {
+                  className: "text-sm text-zinc-200",
+                  children: ex.name
+                }), /*#__PURE__*/_jsx("span", {
+                  className: "text-[11px] text-zinc-500",
+                  children: ex.subtitle
+                })]
+              })]
+            }), /*#__PURE__*/_jsx("span", {
+              className: "font-mono text-sm text-zinc-400",
+              children: ex.kcal
+            })]
+          }, i))
+        }), /*#__PURE__*/_jsxs("button", {
+          className: "flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-orange-500 hover:text-orange-400 transition-colors",
+          children: [/*#__PURE__*/_jsx(Plus, {
+            className: "w-3.5 h-3.5"
+          }), " Add Exercise"]
+        })]
+      })]
+    })]
+  });
+}
+const SLEEP_STAGE_COLORS = {
+  deep: "bg-blue-600",
+  light: "bg-sky-400",
+  rem: "bg-fuchsia-500",
+  awake: "bg-zinc-600"
+};
+
+// Stage proportions computed from actual Garmin data (Jul 20: Deep 55m, Light 4h33m, REM 1h12m, Awake 16m).
+// Exact minute-by-minute order isn't available from the page, so segment order is a reasonable
+// approximation — but the proportions themselves are real, not sample.
+const SLEEP_TIMELINE = [{
+  type: "deep",
+  pct: 13
+}, {
+  type: "light",
+  pct: 20
+}, {
+  type: "awake",
+  pct: 4
+}, {
+  type: "light",
+  pct: 20
+}, {
+  type: "rem",
+  pct: 9
+}, {
+  type: "light",
+  pct: 15
+}, {
+  type: "rem",
+  pct: 8
+}, {
+  type: "light",
+  pct: 11
+}];
+function SleepTab({
+  healthData,
+  sleepScore,
+  syncing,
+  syncError,
+  onSync
+}) {
+  const quality = healthData?.["Sleep Quality"] ?? "—";
+  const duration = healthData?.["Sleep Duration"] ?? "—";
+  const bedtime = healthData?.["Bedtime"] ?? "—";
+  const wakeTime = healthData?.["Wake Time"] ?? "—";
+  const noteHeading = healthData?.["Sleep Note Heading"] ?? "Not synced yet";
+  const noteText = healthData?.["Sleep Note"] ?? "Sync to see last night's summary.";
+  const lastSynced = healthData ? `${healthData.Date || ""} ${healthData.Time || ""}`.trim() : null;
+  const metrics = [{
+    icon: Activity,
+    label: "Restless Moments",
+    value: healthData?.["Restless Moments"] ?? "—"
+  }, {
+    icon: Heart,
+    label: "Resting Heart Rate",
+    value: healthData?.["Resting HR"] ?? "—",
+    unit: healthData?.["Resting HR"] ? "bpm" : ""
+  }, {
+    icon: BatteryCharging,
+    label: "Body Battery Change",
+    value: healthData?.["Body Battery Change"] ?? "—"
+  }, {
+    icon: Percent,
+    label: "Avg SpO2",
+    value: healthData?.["Avg SpO2"] ?? "—",
+    unit: healthData?.["Avg SpO2"] ? "%" : ""
+  }, {
+    icon: Percent,
+    label: "Lowest SpO2",
+    value: healthData?.["Lowest SpO2"] ?? "—",
+    unit: healthData?.["Lowest SpO2"] ? "%" : ""
+  }, {
+    icon: Wind,
+    label: "Avg Respiration",
+    value: healthData?.["Avg Respiration"] ?? "—",
+    unit: healthData?.["Avg Respiration"] ? "brpm" : ""
+  }, {
+    icon: Wind,
+    label: "Lowest Respiration",
+    value: healthData?.["Lowest Respiration"] ?? "—",
+    unit: healthData?.["Lowest Respiration"] ? "brpm" : ""
+  }, {
+    icon: Activity,
+    label: "Avg Overnight HRV",
+    value: healthData?.["Avg Overnight HRV"] ?? "—",
+    unit: healthData?.["Avg Overnight HRV"] ? "ms" : ""
+  }];
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex flex-col gap-6",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-5 border border-zinc-800",
+      children: [/*#__PURE__*/_jsxs("div", {
+        className: "flex items-baseline justify-between mb-4",
+        children: [/*#__PURE__*/_jsxs("div", {
+          className: "flex items-baseline gap-1.5",
+          children: [/*#__PURE__*/_jsx("span", {
+            className: "font-mono text-4xl font-bold text-cyan-400",
+            children: sleepScore
+          }), /*#__PURE__*/_jsx("span", {
+            className: "text-sm text-zinc-500",
+            children: "/ 100"
+          })]
+        }), /*#__PURE__*/_jsxs("button", {
+          onClick: onSync,
+          disabled: syncing,
+          className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-cyan-400/10 text-cyan-400 border border-cyan-400/30 hover:bg-cyan-400/20 transition-colors disabled:opacity-60",
+          children: [/*#__PURE__*/_jsx(RefreshCw, {
+            className: `w-3 h-3 ${syncing ? "animate-spin" : ""}`
+          }), syncing ? "Syncing…" : "Sync from Sheet"]
+        })]
+      }), lastSynced && !syncError && /*#__PURE__*/_jsxs("div", {
+        className: "text-[11px] text-zinc-600 mb-3",
+        children: ["Last synced: ", lastSynced]
+      }), syncError && /*#__PURE__*/_jsxs("div", {
+        className: "flex items-start gap-1.5 mb-3 text-[11px] text-red-400",
+        children: [/*#__PURE__*/_jsx(AlertCircle, {
+          className: "w-3.5 h-3.5 flex-shrink-0 mt-0.5"
+        }), " ", syncError]
+      }), /*#__PURE__*/_jsxs("div", {
+        className: "flex items-center gap-6 mb-4",
+        children: [/*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "text-sm font-semibold text-zinc-200",
+            children: quality
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Quality"
+          })]
+        }), /*#__PURE__*/_jsxs("div", {
+          children: [/*#__PURE__*/_jsx("div", {
+            className: "text-sm font-semibold text-zinc-200",
+            children: duration
+          }), /*#__PURE__*/_jsx("div", {
+            className: "text-[11px] text-zinc-500",
+            children: "Duration"
+          })]
+        })]
+      }), /*#__PURE__*/_jsxs("div", {
+        className: "border-t border-zinc-800 pt-4",
+        children: [/*#__PURE__*/_jsx("span", {
+          className: "text-sm font-semibold text-zinc-200",
+          children: noteHeading
+        }), /*#__PURE__*/_jsx("p", {
+          className: "text-[13px] text-zinc-500 mt-1",
+          children: noteText
+        })]
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+      children: [/*#__PURE__*/_jsx("div", {
+        className: "flex items-center gap-4 text-[11px] text-zinc-500 mb-3",
+        children: ["deep", "light", "rem", "awake"].map(k => /*#__PURE__*/_jsxs("span", {
+          className: "flex items-center gap-1.5 capitalize",
+          children: [/*#__PURE__*/_jsx("span", {
+            className: `w-2 h-2 rounded-full inline-block ${SLEEP_STAGE_COLORS[k]}`
+          }), " ", k]
+        }, k))
+      }), /*#__PURE__*/_jsx("div", {
+        className: "flex w-full h-10 rounded-lg overflow-hidden",
+        children: SLEEP_TIMELINE.map((seg, i) => /*#__PURE__*/_jsx("div", {
+          className: SLEEP_STAGE_COLORS[seg.type],
+          style: {
+            width: `${seg.pct}%`
+          }
+        }, i))
+      }), /*#__PURE__*/_jsxs("div", {
+        className: "flex items-center justify-between text-[11px] text-zinc-500 mt-2",
+        children: [/*#__PURE__*/_jsx("span", {
+          children: bedtime
+        }), /*#__PURE__*/_jsx("span", {
+          children: wakeTime
+        })]
+      }), /*#__PURE__*/_jsx("p", {
+        className: "text-[11px] text-zinc-600 mt-2",
+        children: "Stage proportions are real; exact minute-by-minute order is an approximation since Garmin's raw timeline isn't in the synced data."
+      })]
+    }), /*#__PURE__*/_jsx("div", {
+      className: "grid grid-cols-2 gap-3",
+      children: metrics.map(m => /*#__PURE__*/_jsxs("div", {
+        className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+        children: [/*#__PURE__*/_jsxs("div", {
+          className: "flex items-center justify-between mb-2",
+          children: [/*#__PURE__*/_jsx("span", {
+            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            children: m.label
+          }), /*#__PURE__*/_jsx(m.icon, {
+            className: "w-3.5 h-3.5 text-cyan-400"
+          })]
+        }), /*#__PURE__*/_jsxs("div", {
+          className: "flex items-baseline gap-1",
+          children: [/*#__PURE__*/_jsx("span", {
+            className: "font-mono text-xl font-bold text-zinc-50",
+            children: m.value
+          }), m.unit && /*#__PURE__*/_jsx("span", {
+            className: "text-xs text-zinc-500",
+            children: m.unit
+          })]
+        })]
+      }, m.label))
+    })]
+  });
+}
+function TrendsTab() {
+  return /*#__PURE__*/_jsxs("div", {
+    className: "bg-zinc-900 rounded-xl border border-zinc-800 p-10 flex flex-col items-center justify-center text-center gap-2",
+    children: [/*#__PURE__*/_jsx(TrendingUp, {
+      className: "w-6 h-6 text-cyan-400"
+    }), /*#__PURE__*/_jsx("span", {
+      className: "text-sm text-zinc-400",
+      children: "Trends will chart weight, sleep, stress, and nutrition once real data is flowing in."
+    })]
+  });
+}
+
+// Pulled live via Claude in Chrome from Garmin Connect + MyFitnessPal.
+// Sleep/nutrition reflect Jul 20 (most recent completed day for both — Jul 21 was
+// still in progress for both sites at fetch time). Stress Score is live/current (Jul 21).
+const LIVE_PULL_DATA = {
+  Date: "Jul 20, 2026",
+  Time: "",
+  "Sleep Score": "74",
+  "Sleep Quality": "Fair",
+  "Sleep Duration": "6h 40m",
+  Bedtime: "10:05 PM",
+  "Wake Time": "5:01 AM",
+  "Sleep Note Heading": "Shorter than ideal, restless",
+  "Sleep Note": "You slept a bit less than recommended and were restless — you may not feel fully rested today.",
+  "Restless Moments": "58",
+  "Resting HR": "47",
+  "Body Battery Change": "+70",
+  "Avg SpO2": "93",
+  "Lowest SpO2": "92",
+  "Avg Respiration": "15",
+  "Lowest Respiration": "12",
+  "Avg Overnight HRV": "72",
+  "Stress Score": "16",
+  "Calories Remaining": "316",
+  "Carbs Remaining": "15",
+  "Fat Remaining": "15",
+  "Protein Remaining": "45"
+};
+export default function HealthDashboard() {
+  const [tab, setTab] = useState("overview");
+  const [healthData, setHealthData] = useState(LIVE_PULL_DATA);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState(null);
+  const [stats, setStats] = useState({
+    weight: "",
+    bodyFat: "",
+    muscle: ""
+  });
+  const [loggedByDay, setLoggedByDay] = useState({
+    A: {},
+    B: {},
+    C: {}
+  });
+  const [workoutLogDates, setWorkoutLogDates] = useState({});
+
+  // Load whatever was last successfully synced from the Sheet, but only if we don't
+  // already have fresher data baked in above — an old cached sync shouldn't clobber it.
+  useEffect(() => {
+    if (healthData) return;
+    (async () => {
+      try {
+        const cached = await window.storage.get("health-sync-data");
+        if (cached?.value) setHealthData(JSON.parse(cached.value));
+      } catch (e) {
+        // No cached data yet — that's fine, just start blank.
+      }
+    })();
+  }, []);
+
+  // Load manually-entered body stats, workout log history, and calendar log-dates,
+  // so a reload doesn't lose any of them either.
+  useEffect(() => {
+    (async () => {
+      try {
+        const cachedStats = await window.storage.get("body-stats");
+        if (cachedStats?.value) setStats(JSON.parse(cachedStats.value));
+      } catch (e) {}
+      try {
+        const cachedLog = await window.storage.get("workout-log");
+        if (cachedLog?.value) setLoggedByDay(JSON.parse(cachedLog.value));
+      } catch (e) {}
+      try {
+        const cachedDates = await window.storage.get("workout-log-dates");
+        if (cachedDates?.value) setWorkoutLogDates(JSON.parse(cachedDates.value));
+      } catch (e) {}
+    })();
+  }, []);
+  const saveStats = async next => {
+    setStats(next);
+    try {
+      await window.storage.set("body-stats", JSON.stringify(next), false);
+    } catch (e) {}
+  };
+  const updateLoggedByDay = async updater => {
+    setLoggedByDay(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      window.storage.set("workout-log", JSON.stringify(next), false).catch(() => {});
+      return next;
+    });
+  };
+
+  // Called whenever a workout is logged/unlogged in the Workout tab — marks (or unmarks)
+  // today's real calendar date, which is what the Overview tab's dots actually read from.
+  const markWorkoutToday = isLogged => {
+    const now = new Date();
+    const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    setWorkoutLogDates(prev => {
+      const next = {
+        ...prev,
+        [dateKey]: isLogged
+      };
+      window.storage.set("workout-log-dates", JSON.stringify(next), false).catch(() => {});
+      return next;
+    });
+  };
+  const syncFromSheet = async () => {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const row = await fetchLatestSheetRow();
+      setHealthData(row);
+      await window.storage.set("health-sync-data", JSON.stringify(row), false);
+    } catch (e) {
+      setSyncError(e.message || "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
+  const sleepScore = healthData?.["Sleep Score"] ?? "—";
+  const stressScore = healthData?.["Stress Score"] ?? "—";
+  return /*#__PURE__*/_jsx("div", {
+    className: "min-h-screen bg-zinc-950 text-zinc-50 p-4 sm:p-6",
+    children: /*#__PURE__*/_jsxs("div", {
+      className: "max-w-2xl mx-auto flex flex-col gap-5",
+      children: [/*#__PURE__*/_jsxs("header", {
+        children: [/*#__PURE__*/_jsx("h1", {
+          className: "text-lg font-bold tracking-tight",
+          children: "Health Dashboard"
+        }), /*#__PURE__*/_jsx("p", {
+          className: "text-xs text-zinc-500",
+          children: "Sleep and nutrition reflect real Garmin/MyFitnessPal data pulled live \u2014 weight/body comp still awaiting manual entry"
+        })]
+      }), /*#__PURE__*/_jsx("nav", {
+        className: "grid grid-cols-5 gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800",
+        children: TABS.map(t => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return /*#__PURE__*/_jsxs("button", {
+            onClick: () => setTab(t.id),
+            className: `flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors ${active ? "bg-zinc-800 text-lime-400" : "text-zinc-500 hover:text-zinc-300"}`,
+            children: [/*#__PURE__*/_jsx(Icon, {
+              className: "w-4 h-4"
+            }), t.label]
+          }, t.id);
+        })
+      }), /*#__PURE__*/_jsxs("main", {
+        children: [tab === "overview" && /*#__PURE__*/_jsx(OverviewTab, {
+          sleepScore: sleepScore,
+          stressScore: stressScore,
+          stats: stats,
+          setStats: saveStats,
+          workoutLogDates: workoutLogDates
+        }), tab === "workout" && /*#__PURE__*/_jsx(WorkoutTab, {
+          loggedByDay: loggedByDay,
+          setLoggedByDay: updateLoggedByDay,
+          onLogToday: markWorkoutToday
+        }), tab === "nutrition" && /*#__PURE__*/_jsx(NutritionTab, {
+          healthData: healthData,
+          syncing: syncing,
+          syncError: syncError,
+          onSync: syncFromSheet
+        }), tab === "sleep" && /*#__PURE__*/_jsx(SleepTab, {
+          healthData: healthData,
+          sleepScore: sleepScore,
+          syncing: syncing,
+          syncError: syncError,
+          onSync: syncFromSheet
+        }), tab === "trends" && /*#__PURE__*/_jsx(TrendsTab, {})]
+      })]
+    })
+  });
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(HealthDashboard));
+</script>
+</body>
+</html>
