@@ -89,6 +89,23 @@ async function pushBackendState(data) {
   return result;
 }
 
+// The ONLY safe way to write a partial update (e.g. just the new stats, or just an
+// updated logsByDate). pushBackendState does a full overwrite with no server-side
+// merge, so writing local-only fields directly would silently erase anything not
+// included — e.g. healthData, which none of the dashboard's own save actions know
+// about. This fetches the absolute latest backend state first and layers the partial
+// update on top of it, so nothing already saved (by Sync, by another device, by a
+// Cowork push) is ever dropped.
+async function mergeAndPushBackendState(partial) {
+  const fresh = await fetchBackendState();
+  const merged = {
+    ...fresh,
+    ...partial
+  };
+  await pushBackendState(merged);
+  return merged;
+}
+
 // ---- Design tokens ----
 // Background: zinc-950 / zinc-900 (near-black, lets accents read as signal, not decoration)
 // Accent A (Workout / energy):  lime-400
@@ -3398,14 +3415,14 @@ export default function HealthDashboard() {
           } : prev[key]?.nutrition
         }
       };
-      pushBackendState({
+      mergeAndPushBackendState({
         stats,
         loggedByDay,
         logsByDate: next
       }).catch(() => {});
       return next;
     });
-  }, [healthData]);
+  }, [healthData, backendLoaded]);
   const saveStats = async next => {
     setStats(next);
     const key = dateKey(new Date());
@@ -3419,7 +3436,7 @@ export default function HealthDashboard() {
     setLogsByDate(nextLogsByDate);
     setBackendStatus("saving");
     try {
-      await pushBackendState({
+      await mergeAndPushBackendState({
         stats: next,
         loggedByDay,
         logsByDate: nextLogsByDate
@@ -3475,7 +3492,7 @@ export default function HealthDashboard() {
     setLogsByDate(nextLogsByDate);
     setBackendStatus("saving");
     try {
-      await pushBackendState({
+      await mergeAndPushBackendState({
         stats,
         loggedByDay: nextLoggedByDay,
         logsByDate: nextLogsByDate
