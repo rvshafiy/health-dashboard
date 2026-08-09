@@ -3522,20 +3522,6 @@ export default function HealthDashboard() {
   const [backendLoaded, setBackendLoaded] = useState(false);
   const paramSaveTimer = useRef(null);
 
-  // Local fallback only — shows something on this device before the first real Sync,
-  // never the source of truth. Never allowed to write back to the shared backend.
-  useEffect(() => {
-    if (healthData) return;
-    (async () => {
-      try {
-        const cached = await window.storage.get("health-sync-data");
-        if (cached?.value) setHealthData(JSON.parse(cached.value));
-      } catch (e) {
-        // No cached data yet — that's fine, just start blank.
-      }
-    })();
-  }, []);
-
   // Workout-specific manual entries (pace, distance, set counts you choose per session).
   // Synced through the shared backend like everything else — debounced (waits 800ms after
   // the last keystroke) so typing a pace doesn't fire a network request per character.
@@ -3568,11 +3554,13 @@ export default function HealthDashboard() {
     });
   };
 
-  // Load manually-entered body stats and workout log history from the shared backend —
-  // this is what makes them show up the same on any device, not just the one they were
-  // entered on. backendLoaded only flips true once this finishes (success OR failure) —
-  // nothing else is allowed to write to the backend before that, which is what closes
-  // the race that previously let a save fire with empty defaults and wipe real data.
+  // Loads everything from the shared backend on page open — including healthData, so a
+  // fresh Garmin/MyFitnessPal pull (from Cowork or a live chat pull) shows up automatically
+  // the moment the dashboard is opened, with no button press needed. This is a read-only
+  // GET, so it's safe to run unconditionally on every mount — the earlier data-loss bug was
+  // about auto-WRITEs firing before real data loaded, not about reads. backendLoaded only
+  // flips true once this finishes (success OR failure) — nothing is allowed to write to the
+  // backend before that, which is what closes that original race.
   useEffect(() => {
     (async () => {
       try {
@@ -3581,6 +3569,7 @@ export default function HealthDashboard() {
         if (remote.loggedByDay) setLoggedByDay(remote.loggedByDay);
         if (remote.logsByDate) setLogsByDate(remote.logsByDate);
         if (remote.workoutParams) setWorkoutParams(remote.workoutParams);
+        if (remote.healthData) setHealthData(remote.healthData);
         setBackendStatus("ready");
       } catch (e) {
         setBackendStatus("error");
@@ -3717,7 +3706,6 @@ export default function HealthDashboard() {
       const remote = await fetchBackendState();
       if (!remote.healthData) throw new Error("No synced Garmin/MyFitnessPal data yet — ask Claude to pull it live first.");
       setHealthData(remote.healthData);
-      await window.storage.set("health-sync-data", JSON.stringify(remote.healthData), false);
     } catch (e) {
       setSyncError(e.message || "Sync failed.");
     } finally {
