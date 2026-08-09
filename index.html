@@ -3314,102 +3314,9 @@ function TrendsTab() {
     })]
   });
 }
-
-// Pulled live via Claude in Chrome from Garmin Connect + MyFitnessPal.
-// Sleep/nutrition reflect Jul 20 (most recent completed day for both — Jul 21 was
-// still in progress for both sites at fetch time). Stress Score is live/current (Jul 21).
-const LIVE_PULL_DATA = {
-  Date: "Jul 20, 2026",
-  Time: "",
-  "Sleep Score": "74",
-  "Sleep Quality": "Fair",
-  "Sleep Duration": "6h 40m",
-  Bedtime: "10:05 PM",
-  "Wake Time": "5:01 AM",
-  "Sleep Note Heading": "Shorter than ideal, restless",
-  "Sleep Note": "You slept a bit less than recommended and were restless — you may not feel fully rested today.",
-  "Restless Moments": "58",
-  "Resting HR": "47",
-  "Body Battery Change": "+70",
-  "Avg SpO2": "93",
-  "Lowest SpO2": "92",
-  "Avg Respiration": "15",
-  "Lowest Respiration": "12",
-  "Avg Overnight HRV": "72",
-  "Stress Score": "16",
-  "Calories Remaining": "316",
-  "Carbs Remaining": "15",
-  "Fat Remaining": "15",
-  "Protein Remaining": "45",
-  meals: [{
-    name: "Breakfast",
-    kcal: 658,
-    carbsPct: 37,
-    fatPct: 25,
-    proteinPct: 38,
-    items: [{
-      name: "Egg White",
-      subtitle: "Ntuc Egg, 5 Egg (50g)",
-      kcal: 130
-    }, {
-      name: "Fish Oil",
-      subtitle: "Carlson Very Finest Fish Oil, 2 Teaspoon",
-      kcal: 80
-    }, {
-      name: "Dates",
-      subtitle: "Ajwa, 2 date",
-      kcal: 46
-    }, {
-      name: "Whey Isolate",
-      subtitle: "Nutrabio, 1 Scoop",
-      kcal: 120
-    }, {
-      name: "Kaya Cheese Pancake",
-      subtitle: "Mr. Bean, 136 g",
-      kcal: 282
-    }]
-  }, {
-    name: "Lunch",
-    kcal: 430,
-    carbsPct: 32,
-    fatPct: 38,
-    proteinPct: 22,
-    items: [{
-      name: "Beef Shawarma",
-      subtitle: "wewa, 1 half pita",
-      kcal: 430
-    }]
-  }, {
-    name: "Dinner",
-    kcal: 483,
-    carbsPct: 9,
-    fatPct: 26,
-    proteinPct: 62,
-    items: [{
-      name: "Chicken Breast, Grilled, Skinless",
-      subtitle: "250 g",
-      kcal: 440
-    }, {
-      name: "Blueberries",
-      subtitle: "75 g",
-      kcal: 43
-    }]
-  }, {
-    name: "Snacks",
-    kcal: 160,
-    carbsPct: 80,
-    fatPct: 17,
-    proteinPct: 5,
-    items: [{
-      name: "Salted Caramel Cold Brew",
-      subtitle: "Coffee Bean & Tea Leaf, 12 oz",
-      kcal: 160
-    }]
-  }]
-};
 export default function HealthDashboard() {
   const [tab, setTab] = useState("overview");
-  const [healthData, setHealthData] = useState(LIVE_PULL_DATA);
+  const [healthData, setHealthData] = useState(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState(null);
   const [stats, setStats] = useState({
@@ -3425,9 +3332,10 @@ export default function HealthDashboard() {
   const [logsByDate, setLogsByDate] = useState({});
   const [backendStatus, setBackendStatus] = useState("loading"); // loading | ready | saving | saved | error
   const [backendError, setBackendError] = useState(null);
+  const [backendLoaded, setBackendLoaded] = useState(false);
 
-  // Load whatever was last successfully synced from the Sheet, but only if we don't
-  // already have fresher data baked in above — an old cached sync shouldn't clobber it.
+  // Local fallback only — shows something on this device before the first real Sync,
+  // never the source of truth. Never allowed to write back to the shared backend.
   useEffect(() => {
     if (healthData) return;
     (async () => {
@@ -3442,7 +3350,9 @@ export default function HealthDashboard() {
 
   // Load manually-entered body stats and workout log history from the shared backend —
   // this is what makes them show up the same on any device, not just the one they were
-  // entered on.
+  // entered on. backendLoaded only flips true once this finishes (success OR failure) —
+  // nothing else is allowed to write to the backend before that, which is what closes
+  // the race that previously let a save fire with empty defaults and wipe real data.
   useEffect(() => {
     (async () => {
       try {
@@ -3454,6 +3364,8 @@ export default function HealthDashboard() {
       } catch (e) {
         setBackendStatus("error");
         setBackendError(e.message || "Could not load synced data.");
+      } finally {
+        setBackendLoaded(true);
       }
     })();
   }, []);
@@ -3461,7 +3373,9 @@ export default function HealthDashboard() {
   // Whenever a Garmin/MyFitnessPal pull lands (healthData changes), fold its sleep and
   // nutrition numbers into logsByDate under whichever real date that data was for — this
   // is what lets the calendar show sleep/nutrition dots without a separate manual log step.
+  // Guarded by backendLoaded so this can never fire before real saved data has loaded.
   useEffect(() => {
+    if (!backendLoaded) return;
     if (!healthData?.Date) return;
     const parsed = new Date(healthData.Date);
     if (isNaN(parsed)) return;
