@@ -9,8 +9,6 @@
   html, body { background: #09090b; margin: 0; }
 </style>
 
-<!-- Import map: resolves the bare "react" / "lucide-react" / "papaparse" specifiers
-     used in the compiled code below to real CDN modules with real network access. -->
 <script type="importmap">
 {
   "imports": {
@@ -23,10 +21,9 @@
 }
 </script>
 
-<!-- window.storage polyfill: makes claude.ai's artifact storage calls work against
-     this browser's localStorage instead, so the component logic didn't need to change.
-     NOTE: this is per-browser/per-device storage — see the chat for the plan to replace
-     this with a shared backend (Google Apps Script) so data syncs across devices. -->
+<!-- window.storage polyfill — only used now for caching the Garmin/MFP CSV sync result.
+     Manual entries (body stats, workout log) go through the Apps Script backend instead,
+     so they sync across devices rather than staying local to this browser. -->
 <script>
   window.storage = {
     async get(key) {
@@ -54,7 +51,6 @@
 <body>
 <div id="root"></div>
 
-<!-- Pre-compiled from the JSX source (Babel run ahead of time, not in your browser). -->
 <script type="module">
 import React from "react";
 import ReactDOM from "react-dom/client";
@@ -67,6 +63,40 @@ import { Home, Dumbbell, Apple, TrendingUp, Moon, Zap, Scale, Percent, Activity,
 // The dashboard reads the LAST row of this sheet as the most recent sync.
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSfpLXkeC_6BtP3zOuwvtNe4CId2VnjhMuUR-4pYWR1sz7t1G2rbyLOc_VJxBqsD5vsaZGahcF1AE9z/pub?gid=0&single=true&output=csv";
+
+// Apps Script backend — this is the shared cross-device store for manual entries
+// (body stats, workout log history). It's separate from the CSV sync above, which is
+// read-only and only covers Garmin/MyFitnessPal data.
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4a7Sbu6D_kustd0GR1L-1EjW_ApGuEbP0LCVHtL8OaAH3-fNorGbFAGu_tdW_2gPh5w/exec";
+const APPS_SCRIPT_SECRET = "rashidin-health-dash-7k2m9x";
+
+// Loads the current shared state blob (stats + loggedByDay + workoutLogDates) from the backend.
+async function fetchBackendState() {
+  const res = await fetch(APPS_SCRIPT_URL);
+  if (!res.ok) throw new Error(`Backend fetch failed (${res.status}).`);
+  const text = await res.text();
+  return JSON.parse(text || "{}");
+}
+
+// Overwrites the shared state blob on the backend with the full current picture.
+// Uses text/plain on purpose — application/json would trigger a CORS preflight
+// (an OPTIONS request) that Apps Script doesn't handle, breaking the save silently.
+async function pushBackendState(data) {
+  const res = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8"
+    },
+    body: JSON.stringify({
+      secret: APPS_SCRIPT_SECRET,
+      data
+    })
+  });
+  if (!res.ok) throw new Error(`Backend save failed (${res.status}).`);
+  const result = JSON.parse(await res.text());
+  if (result.error) throw new Error(result.error);
+  return result;
+}
 
 // ---- Design tokens ----
 // Background: zinc-950 / zinc-900 (near-black, lets accents read as signal, not decoration)
@@ -2747,8 +2777,7 @@ function WorkoutBody({
 }
 function WorkoutTab({
   loggedByDay,
-  setLoggedByDay,
-  onLogToday
+  onToggleLog
 }) {
   const [system, setSystem] = useState("A");
   const [expandedDay, setExpandedDay] = useState(null);
@@ -2758,16 +2787,7 @@ function WorkoutTab({
     length: sys.maxDay
   }, (_, i) => i + 1);
   const toggleLog = day => {
-    const newValue = !loggedByDay[system]?.[day];
-    setLoggedByDay(prev => ({
-      ...prev,
-      [system]: {
-        ...prev[system],
-        [day]: newValue
-      }
-    }));
-    // Logging a workout always means "I did this today" — reflect that on the Overview calendar.
-    if (onLogToday) onLogToday(newValue);
+    onToggleLog(system, day);
   };
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-6",
@@ -3331,6 +3351,8 @@ export default function HealthDashboard() {
     C: {}
   });
   const [workoutLogDates, setWorkoutLogDates] = useState({});
+  const [backendStatus, setBackendStatus] = useState("loading"); // loading | ready | saving | saved | error
+  const [backendError, setBackendError] = useState(null);
 
   // Load whatever was last successfully synced from the Sheet, but only if we don't
   // already have fresher data baked in above — an old cached sync shouldn't clobber it.
@@ -3346,51 +3368,71 @@ export default function HealthDashboard() {
     })();
   }, []);
 
-  // Load manually-entered body stats, workout log history, and calendar log-dates,
-  // so a reload doesn't lose any of them either.
+  // Load manually-entered body stats and workout log history from the shared backend —
+  // this is what makes them show up the same on any device, not just the one they were
+  // entered on.
   useEffect(() => {
     (async () => {
       try {
-        const cachedStats = await window.storage.get("body-stats");
-        if (cachedStats?.value) setStats(JSON.parse(cachedStats.value));
-      } catch (e) {}
-      try {
-        const cachedLog = await window.storage.get("workout-log");
-        if (cachedLog?.value) setLoggedByDay(JSON.parse(cachedLog.value));
-      } catch (e) {}
-      try {
-        const cachedDates = await window.storage.get("workout-log-dates");
-        if (cachedDates?.value) setWorkoutLogDates(JSON.parse(cachedDates.value));
-      } catch (e) {}
+        const remote = await fetchBackendState();
+        if (remote.stats) setStats(remote.stats);
+        if (remote.loggedByDay) setLoggedByDay(remote.loggedByDay);
+        if (remote.workoutLogDates) setWorkoutLogDates(remote.workoutLogDates);
+        setBackendStatus("ready");
+      } catch (e) {
+        setBackendStatus("error");
+        setBackendError(e.message || "Could not load synced data.");
+      }
     })();
   }, []);
   const saveStats = async next => {
     setStats(next);
+    setBackendStatus("saving");
     try {
-      await window.storage.set("body-stats", JSON.stringify(next), false);
-    } catch (e) {}
-  };
-  const updateLoggedByDay = async updater => {
-    setLoggedByDay(prev => {
-      const next = typeof updater === "function" ? updater(prev) : updater;
-      window.storage.set("workout-log", JSON.stringify(next), false).catch(() => {});
-      return next;
-    });
+      await pushBackendState({
+        stats: next,
+        loggedByDay,
+        workoutLogDates
+      });
+      setBackendStatus("saved");
+    } catch (e) {
+      setBackendStatus("error");
+      setBackendError(e.message || "Save failed.");
+    }
   };
 
-  // Called whenever a workout is logged/unlogged in the Workout tab — marks (or unmarks)
-  // today's real calendar date, which is what the Overview tab's dots actually read from.
-  const markWorkoutToday = isLogged => {
+  // Single handler for the Workout tab's Log button — computes both the per-day log entry
+  // AND today's calendar date entry together, then saves them in one combined write.
+  // (Two separate writes here would race each other and could silently drop one.)
+  const handleToggleLog = async (system, day) => {
+    const newValue = !loggedByDay[system]?.[day];
+    const nextLoggedByDay = {
+      ...loggedByDay,
+      [system]: {
+        ...loggedByDay[system],
+        [day]: newValue
+      }
+    };
     const now = new Date();
     const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    setWorkoutLogDates(prev => {
-      const next = {
-        ...prev,
-        [dateKey]: isLogged
-      };
-      window.storage.set("workout-log-dates", JSON.stringify(next), false).catch(() => {});
-      return next;
-    });
+    const nextWorkoutLogDates = {
+      ...workoutLogDates,
+      [dateKey]: newValue
+    };
+    setLoggedByDay(nextLoggedByDay);
+    setWorkoutLogDates(nextWorkoutLogDates);
+    setBackendStatus("saving");
+    try {
+      await pushBackendState({
+        stats,
+        loggedByDay: nextLoggedByDay,
+        workoutLogDates: nextWorkoutLogDates
+      });
+      setBackendStatus("saved");
+    } catch (e) {
+      setBackendStatus("error");
+      setBackendError(e.message || "Save failed.");
+    }
   };
   const syncFromSheet = async () => {
     setSyncing(true);
@@ -3407,6 +3449,13 @@ export default function HealthDashboard() {
   };
   const sleepScore = healthData?.["Sleep Score"] ?? "—";
   const stressScore = healthData?.["Stress Score"] ?? "—";
+  const backendStatusLabel = {
+    loading: "Loading synced data…",
+    ready: "Synced across devices",
+    saving: "Saving…",
+    saved: "Saved — synced across devices",
+    error: backendError || "Sync error — changes are only saved on this device right now"
+  }[backendStatus];
   return /*#__PURE__*/_jsx("div", {
     className: "min-h-screen bg-zinc-950 text-zinc-50 p-4 sm:p-6",
     children: /*#__PURE__*/_jsxs("div", {
@@ -3417,7 +3466,10 @@ export default function HealthDashboard() {
           children: "Health Dashboard"
         }), /*#__PURE__*/_jsx("p", {
           className: "text-xs text-zinc-500",
-          children: "Sleep and nutrition reflect real Garmin/MyFitnessPal data pulled live \u2014 weight/body comp still awaiting manual entry"
+          children: "Sleep and nutrition reflect real Garmin/MyFitnessPal data pulled live"
+        }), /*#__PURE__*/_jsx("p", {
+          className: `text-[11px] mt-0.5 ${backendStatus === "error" ? "text-red-400" : "text-zinc-600"}`,
+          children: backendStatusLabel
         })]
       }), /*#__PURE__*/_jsx("nav", {
         className: "grid grid-cols-5 gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800",
@@ -3441,8 +3493,7 @@ export default function HealthDashboard() {
           workoutLogDates: workoutLogDates
         }), tab === "workout" && /*#__PURE__*/_jsx(WorkoutTab, {
           loggedByDay: loggedByDay,
-          setLoggedByDay: updateLoggedByDay,
-          onLogToday: markWorkoutToday
+          onToggleLog: handleToggleLog
         }), tab === "nutrition" && /*#__PURE__*/_jsx(NutritionTab, {
           healthData: healthData,
           syncing: syncing,
