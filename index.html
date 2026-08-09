@@ -3552,15 +3552,20 @@ function WeekLineChart({
   const [hoverIdx, setHoverIdx] = useState(null);
   const width = 320;
   const height = 96;
-  const padX = 10;
   const padTop = 10;
   const padBottom = 8;
   const allVals = series.flatMap(s => points.map(p => p.values[s.key]).filter(v => v != null));
   const max = allVals.length ? Math.max(...allVals) : 1;
   const min = allVals.length ? Math.min(...allVals) : 0;
   const range = max - min || 1;
-  const stepX = (width - padX * 2) / (points.length - 1);
-  const toX = i => padX + i * stepX;
+
+  // No horizontal padding here on purpose — dot i sits at exactly i/(n-1) of the width,
+  // the same fraction the day-label row (justify-between), the hover zones (7 equal
+  // flex-1 slices), and the tooltip's left:% all use. Padding this differently from
+  // those was the earlier bug: dots visually drifted from their labels, and hovering
+  // near a real dot could resolve to a neighboring (sometimes empty) day instead.
+  const stepX = width / (points.length - 1);
+  const toX = i => i * stepX;
   const toY = v => height - padBottom - (v - min) / (range || 1) * (height - padTop - padBottom);
   const hasAnyData = allVals.length > 0;
   return /*#__PURE__*/_jsxs("div", {
