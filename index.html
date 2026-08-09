@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Health Dashboard</title>
+<title>RVSH Health Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   html, body { background: #09090b; margin: 0; }
@@ -139,6 +139,16 @@ const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // Formats a JS Date as YYYY-MM-DD — the key used throughout for tying a log entry to a real calendar day.
 function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// Parses a Garmin-style duration string ("8h 9m", "6h 40m", "45m") into total minutes.
+// Returns null if it can't parse anything usable, rather than guessing.
+function parseDurationToMinutes(str) {
+  if (!str) return null;
+  const hMatch = str.match(/(\d+)\s*h/);
+  const mMatch = str.match(/(\d+)\s*m/);
+  if (!hMatch && !mMatch) return null;
+  return (hMatch ? parseInt(hMatch[1], 10) * 60 : 0) + (mMatch ? parseInt(mMatch[1], 10) : 0);
 }
 const SYSTEMS = {
   A: {
@@ -2762,7 +2772,8 @@ function OverviewTab({
   stressScore,
   stats,
   setStats,
-  logsByDate
+  logsByDate,
+  onDeleteWorkout
 }) {
   const {
     cells,
@@ -2889,14 +2900,24 @@ function OverviewTab({
             children: [/*#__PURE__*/_jsx("span", {
               className: `w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${cell.workoutLogged ? "bg-lime-400" : "bg-zinc-800"}`
             }), cell.workoutLogged ? /*#__PURE__*/_jsx("div", {
-              className: "text-sm text-zinc-300 flex flex-col gap-1",
+              className: "text-sm text-zinc-300 flex flex-col gap-1 flex-1",
               children: entry.workouts.map((w, i) => /*#__PURE__*/_jsxs("div", {
-                children: [/*#__PURE__*/_jsx("span", {
-                  className: "font-medium text-zinc-200",
-                  children: w.title
-                }), /*#__PURE__*/_jsxs("span", {
-                  className: "text-zinc-500",
-                  children: [" \u2014 System ", w.system, ", ", w.day]
+                className: "flex items-center justify-between gap-2",
+                children: [/*#__PURE__*/_jsxs("div", {
+                  children: [/*#__PURE__*/_jsx("span", {
+                    className: "font-medium text-zinc-200",
+                    children: w.title
+                  }), /*#__PURE__*/_jsxs("span", {
+                    className: "text-zinc-500",
+                    children: [" \u2014 System ", w.system, ", ", w.day]
+                  })]
+                }), /*#__PURE__*/_jsx("button", {
+                  onClick: () => onDeleteWorkout(cell.dateKey, i),
+                  className: "text-zinc-600 hover:text-red-400 flex-shrink-0 transition-colors",
+                  title: "Delete this logged workout",
+                  children: /*#__PURE__*/_jsx(X, {
+                    className: "w-3.5 h-3.5"
+                  })
                 })]
               }, i))
             }) : /*#__PURE__*/_jsx("span", {
@@ -3042,7 +3063,6 @@ function WorkoutBody({
   });
 }
 function WorkoutTab({
-  loggedByDay,
   onToggleLog,
   workoutParams,
   onParamChange
@@ -3064,9 +3084,6 @@ function WorkoutTab({
   const confirmLog = day => {
     onToggleLog(system, day, pickerDate);
     setPickerDay(null);
-  };
-  const unlog = day => {
-    onToggleLog(system, day, null);
   };
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-6",
@@ -3100,7 +3117,6 @@ function WorkoutTab({
         const workout = sys.workouts[dayKey];
         const isToday = sys.type === "weekly" && day === todayName;
         const isExpanded = expandedDay === day;
-        const isLogged = !!loggedByDay[system]?.[day];
         const isRestLike = !workout.exercises && !workout.sections;
         const isPicking = pickerDay === day;
         return /*#__PURE__*/_jsxs("div", {
@@ -3117,15 +3133,13 @@ function WorkoutTab({
                 className: "text-sm font-semibold text-zinc-200 truncate",
                 children: workout.title
               })]
-            }), !isRestLike && /*#__PURE__*/_jsxs("button", {
+            }), !isRestLike && /*#__PURE__*/_jsx("button", {
               onClick: e => {
                 e.stopPropagation();
-                isLogged ? unlog(day) : openPicker(day);
+                openPicker(day);
               },
-              className: `flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors ${isLogged ? "bg-lime-400/10 text-lime-400" : "bg-lime-400 text-zinc-950 hover:bg-lime-300"}`,
-              children: [isLogged ? /*#__PURE__*/_jsx(Check, {
-                className: "w-3.5 h-3.5"
-              }) : null, isLogged ? "Logged" : "Log"]
+              className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors bg-lime-400 text-zinc-950 hover:bg-lime-300",
+              children: "Log"
             })]
           }), isPicking && /*#__PURE__*/_jsxs("div", {
             className: "px-4 pb-3 flex items-center gap-2",
@@ -3489,14 +3503,354 @@ function SleepTab({
     })]
   });
 }
-function TrendsTab() {
+
+// One bar per day of the selected week. Handles missing data honestly — a day with no
+// synced value for this metric shows a dashed baseline instead of a fabricated zero bar.
+// Builds a smooth SVG path through a set of points, skipping gaps where value is null
+// (splits into separate path segments rather than drawing a misleading line across
+// missing days). Uses a simple horizontal-tangent cubic bezier for the curve.
+function smoothPathSegments(coords) {
+  const segments = [];
+  let current = [];
+  coords.forEach(c => {
+    if (c === null) {
+      if (current.length) segments.push(current);
+      current = [];
+    } else {
+      current.push(c);
+    }
+  });
+  if (current.length) segments.push(current);
+  return segments.map(seg => {
+    if (seg.length === 1) return {
+      d: null,
+      dot: seg[0]
+    };
+    let d = `M ${seg[0].x},${seg[0].y}`;
+    for (let i = 0; i < seg.length - 1; i++) {
+      const p0 = seg[i],
+        p1 = seg[i + 1];
+      const midX = (p0.x + p1.x) / 2;
+      d += ` C ${midX},${p0.y} ${midX},${p1.y} ${p1.x},${p1.y}`;
+    }
+    return {
+      d,
+      dots: seg
+    };
+  });
+}
+
+// One chart, one or more series sharing an x-axis (days of the week) and a single
+// y-scale — only combine series here when their units are genuinely comparable
+// (e.g. kg with kg), otherwise a shared scale visually distorts the smaller-range one.
+function WeekLineChart({
+  title,
+  unit,
+  series,
+  points
+}) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const width = 320;
+  const height = 96;
+  const padX = 10;
+  const padTop = 10;
+  const padBottom = 8;
+  const allVals = series.flatMap(s => points.map(p => p.values[s.key]).filter(v => v != null));
+  const max = allVals.length ? Math.max(...allVals) : 1;
+  const min = allVals.length ? Math.min(...allVals) : 0;
+  const range = max - min || 1;
+  const stepX = (width - padX * 2) / (points.length - 1);
+  const toX = i => padX + i * stepX;
+  const toY = v => height - padBottom - (v - min) / (range || 1) * (height - padTop - padBottom);
+  const hasAnyData = allVals.length > 0;
   return /*#__PURE__*/_jsxs("div", {
-    className: "bg-zinc-900 rounded-xl border border-zinc-800 p-10 flex flex-col items-center justify-center text-center gap-2",
-    children: [/*#__PURE__*/_jsx(TrendingUp, {
-      className: "w-6 h-6 text-cyan-400"
-    }), /*#__PURE__*/_jsx("span", {
-      className: "text-sm text-zinc-400",
-      children: "Trends will chart weight, sleep, stress, and nutrition once real data is flowing in."
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "flex items-center justify-between mb-1",
+      children: [/*#__PURE__*/_jsxs("div", {
+        className: "flex items-center gap-3",
+        children: [/*#__PURE__*/_jsx("span", {
+          className: "text-[11px] uppercase tracking-wide text-zinc-500",
+          children: title
+        }), series.length > 1 && /*#__PURE__*/_jsx("div", {
+          className: "flex items-center gap-2",
+          children: series.map(s => /*#__PURE__*/_jsxs("span", {
+            className: "flex items-center gap-1 text-[10px] text-zinc-500",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: "w-2 h-2 rounded-full inline-block",
+              style: {
+                backgroundColor: s.color
+              }
+            }), " ", s.label]
+          }, s.key))
+        })]
+      }), unit && /*#__PURE__*/_jsx("span", {
+        className: "text-[10px] text-zinc-600",
+        children: unit
+      })]
+    }), !hasAnyData ? /*#__PURE__*/_jsx("div", {
+      className: "h-24 flex items-center justify-center text-[11px] text-zinc-600 border border-dashed border-zinc-800 rounded-lg",
+      children: "No data yet this week"
+    }) : /*#__PURE__*/_jsxs("div", {
+      className: "relative",
+      style: {
+        height
+      },
+      children: [/*#__PURE__*/_jsxs("svg", {
+        viewBox: `0 0 ${width} ${height}`,
+        className: "w-full h-full overflow-visible",
+        children: [hoverIdx !== null && /*#__PURE__*/_jsx("line", {
+          x1: toX(hoverIdx),
+          y1: padTop,
+          x2: toX(hoverIdx),
+          y2: height - padBottom,
+          stroke: "#3f3f46",
+          strokeWidth: "1",
+          strokeDasharray: "3,3"
+        }), series.map(s => {
+          const coords = points.map((p, i) => p.values[s.key] != null ? {
+            x: toX(i),
+            y: toY(p.values[s.key])
+          } : null);
+          const parts = smoothPathSegments(coords);
+          return /*#__PURE__*/_jsxs("g", {
+            children: [parts.map((part, i) => part.d ? /*#__PURE__*/_jsx("path", {
+              d: part.d,
+              fill: "none",
+              stroke: s.color,
+              strokeWidth: "2",
+              strokeLinecap: "round"
+            }, i) : null), coords.map((c, i) => c ? /*#__PURE__*/_jsx("circle", {
+              cx: c.x,
+              cy: c.y,
+              r: hoverIdx === i ? 3.5 : 2.5,
+              fill: s.color
+            }, i) : null)]
+          }, s.key);
+        })]
+      }), /*#__PURE__*/_jsx("div", {
+        className: "absolute inset-0 flex",
+        children: points.map((p, i) => /*#__PURE__*/_jsx("div", {
+          className: "flex-1 h-full cursor-default",
+          onMouseEnter: () => setHoverIdx(i),
+          onMouseLeave: () => setHoverIdx(null)
+        }, i))
+      }), hoverIdx !== null && /*#__PURE__*/_jsxs("div", {
+        className: "absolute top-0 bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] shadow-lg pointer-events-none z-10 whitespace-nowrap",
+        style: {
+          left: `${hoverIdx / (points.length - 1) * 100}%`,
+          transform: `translateX(${hoverIdx === 0 ? "0%" : hoverIdx === points.length - 1 ? "-100%" : "-50%"})`
+        },
+        children: [/*#__PURE__*/_jsx("div", {
+          className: "text-zinc-500 mb-0.5",
+          children: points[hoverIdx].label
+        }), series.map(s => /*#__PURE__*/_jsxs("div", {
+          className: "flex items-center gap-1.5 text-zinc-200",
+          children: [/*#__PURE__*/_jsx("span", {
+            className: "w-1.5 h-1.5 rounded-full inline-block flex-shrink-0",
+            style: {
+              backgroundColor: s.color
+            }
+          }), series.length > 1 && /*#__PURE__*/_jsxs("span", {
+            className: "text-zinc-500",
+            children: [s.label, ":"]
+          }), /*#__PURE__*/_jsxs("span", {
+            className: "font-mono",
+            children: [points[hoverIdx].values[s.key] != null ? points[hoverIdx].values[s.key] : "—", unit ? ` ${unit}` : ""]
+          })]
+        }, s.key))]
+      })]
+    }), /*#__PURE__*/_jsx("div", {
+      className: "flex justify-between text-[9px] text-zinc-600 mt-1",
+      children: points.map((p, i) => /*#__PURE__*/_jsx("span", {
+        className: p.isToday ? "text-zinc-200 font-bold" : "",
+        children: p.label
+      }, i))
+    })]
+  });
+}
+function TrendsTab({
+  logsByDate
+}) {
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = this week, -1 = last week, etc.
+  const dayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+  const weekDates = useMemo(() => {
+    const today = new Date();
+    const sunday = new Date(today);
+    sunday.setDate(today.getDate() - today.getDay() + weekOffset * 7);
+    return Array.from({
+      length: 7
+    }, (_, i) => {
+      const d = new Date(sunday);
+      d.setDate(sunday.getDate() + i);
+      return d;
+    });
+  }, [weekOffset]);
+  const today = new Date();
+  const todayKey = dateKey(today);
+  const weekLabel = `${weekDates[0].toLocaleDateString("default", {
+    month: "short",
+    day: "numeric"
+  })} – ${weekDates[6].toLocaleDateString("default", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  })}`;
+  const consumedFor = entry => {
+    if (!entry?.nutrition) return null;
+    const meals = entry.nutrition.meals || [];
+    return meals.reduce((acc, m) => {
+      const g = mealMacroGrams(m);
+      return {
+        calories: acc.calories + (m.kcal || 0),
+        carbs: acc.carbs + g.carbs,
+        fat: acc.fat + g.fat,
+        protein: acc.protein + g.protein
+      };
+    }, {
+      calories: 0,
+      carbs: 0,
+      fat: 0,
+      protein: 0
+    });
+  };
+
+  // Each chart's points share the same shape: { label, isToday, values: { seriesKey: number|null } }
+  const buildPoints = valuesFor => weekDates.map((d, i) => {
+    const entry = logsByDate?.[dateKey(d)];
+    return {
+      label: dayLabels[i],
+      isToday: dateKey(d) === todayKey,
+      values: valuesFor(entry)
+    };
+  });
+  const weightMusclePoints = buildPoints(e => ({
+    weight: e?.bodyStats?.weight ? parseFloat(e.bodyStats.weight) : null,
+    muscle: e?.bodyStats?.muscle ? parseFloat(e.bodyStats.muscle) : null
+  }));
+  const bodyFatPoints = buildPoints(e => ({
+    bodyFat: e?.bodyStats?.bodyFat ? parseFloat(e.bodyStats.bodyFat) : null
+  }));
+  const durationPoints = buildPoints(e => ({
+    duration: e?.sleepDurationMinutes != null ? +(e.sleepDurationMinutes / 60).toFixed(1) : null
+  }));
+  const stressPoints = buildPoints(e => ({
+    stress: e?.stressScore ? parseFloat(e.stressScore) : null
+  }));
+  const caloriesPoints = buildPoints(e => ({
+    calories: consumedFor(e)?.calories ?? null
+  }));
+  const macroPoints = buildPoints(e => {
+    const c = consumedFor(e);
+    return {
+      protein: c?.protein ?? null,
+      carbs: c?.carbs ?? null,
+      fat: c?.fat ?? null
+    };
+  });
+  return /*#__PURE__*/_jsxs("div", {
+    className: "flex flex-col gap-6",
+    children: [/*#__PURE__*/_jsxs("div", {
+      className: "flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3 border border-zinc-800",
+      children: [/*#__PURE__*/_jsx("button", {
+        onClick: () => setWeekOffset(o => o - 1),
+        className: "text-zinc-400 hover:text-zinc-200 px-2 py-1 text-sm",
+        children: "\u2039 Prev"
+      }), /*#__PURE__*/_jsx("span", {
+        className: "text-sm font-semibold text-zinc-200",
+        children: weekLabel
+      }), /*#__PURE__*/_jsx("button", {
+        onClick: () => setWeekOffset(o => Math.min(0, o + 1)),
+        disabled: weekOffset >= 0,
+        className: "text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700 disabled:cursor-default px-2 py-1 text-sm",
+        children: "Next \u203A"
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-sm font-semibold text-zinc-200",
+        children: "Body Composition"
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Weight & Skeletal Muscle",
+        unit: "kg",
+        series: [{
+          key: "weight",
+          label: "Weight",
+          color: "#a78bfa"
+        }, {
+          key: "muscle",
+          label: "Muscle",
+          color: "#e879f9"
+        }],
+        points: weightMusclePoints
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Body Fat",
+        unit: "%",
+        series: [{
+          key: "bodyFat",
+          label: "Body Fat",
+          color: "#a78bfa"
+        }],
+        points: bodyFatPoints
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-sm font-semibold text-zinc-200",
+        children: "Sleep"
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Duration",
+        unit: "hrs",
+        series: [{
+          key: "duration",
+          label: "Duration",
+          color: "#22d3ee"
+        }],
+        points: durationPoints
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Stress Score",
+        unit: "",
+        series: [{
+          key: "stress",
+          label: "Stress",
+          color: "#22d3ee"
+        }],
+        points: stressPoints
+      })]
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-sm font-semibold text-zinc-200",
+        children: "Nutrition"
+      }), /*#__PURE__*/_jsx("span", {
+        className: "text-[11px] text-zinc-600 -mt-4",
+        children: "Calories consumed are synced directly; macro grams are estimated from each meal's calories and macro %."
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Calories",
+        unit: "kcal",
+        series: [{
+          key: "calories",
+          label: "Calories",
+          color: "#f97316"
+        }],
+        points: caloriesPoints
+      }), /*#__PURE__*/_jsx(WeekLineChart, {
+        title: "Macros",
+        unit: "g",
+        series: [{
+          key: "protein",
+          label: "Protein",
+          color: "#f97316"
+        }, {
+          key: "carbs",
+          label: "Carbs",
+          color: "#fbbf24"
+        }, {
+          key: "fat",
+          label: "Fat",
+          color: "#f87171"
+        }],
+        points: macroPoints
+      })]
     })]
   });
 }
@@ -3580,10 +3934,11 @@ export default function HealthDashboard() {
     })();
   }, []);
 
-  // Whenever a Garmin/MyFitnessPal pull lands (healthData changes), fold its sleep and
-  // nutrition numbers into logsByDate under whichever real date that data was for — this
-  // is what lets the calendar show sleep/nutrition dots without a separate manual log step.
-  // Guarded by backendLoaded so this can never fire before real saved data has loaded.
+  // Whenever a Garmin/MyFitnessPal pull lands (healthData changes), fold its sleep,
+  // stress, and nutrition numbers into logsByDate under whichever real date that data
+  // was for — this is what lets the calendar (and Trends chart) show that data without
+  // a separate manual log step. Guarded by backendLoaded so this can never fire before
+  // real saved data has loaded.
   useEffect(() => {
     if (!backendLoaded) return;
     if (!healthData?.Date) return;
@@ -3591,7 +3946,7 @@ export default function HealthDashboard() {
     if (isNaN(parsed)) return;
     const key = dateKey(parsed);
     setLogsByDate(prev => {
-      if (prev[key]?.sleepScore === healthData["Sleep Score"] && prev[key]?.nutrition?.calories === healthData["Calories Remaining"]) {
+      if (prev[key]?.sleepScore === healthData["Sleep Score"] && prev[key]?.nutrition?.calories === healthData["Calories Remaining"] && prev[key]?.stressScore === healthData["Stress Score"]) {
         return prev; // already backfilled, avoid a redundant save loop
       }
       const next = {
@@ -3599,6 +3954,8 @@ export default function HealthDashboard() {
         [key]: {
           ...prev[key],
           sleepScore: healthData["Sleep Score"] || undefined,
+          sleepDurationMinutes: parseDurationToMinutes(healthData["Sleep Duration"]) ?? prev[key]?.sleepDurationMinutes,
+          stressScore: healthData["Stress Score"] || undefined,
           nutrition: healthData["Calories Remaining"] ? {
             calories: healthData["Calories Remaining"],
             carbs: healthData["Carbs Remaining"],
@@ -3646,51 +4003,53 @@ export default function HealthDashboard() {
   // AND the calendar's date-keyed record together, then saves both in one combined write —
   // two separate writes here would race each other and could silently drop one.
   const handleToggleLog = async (system, day, logDate) => {
-    const wasLogged = !!loggedByDay[system]?.[day];
-    const newValue = !wasLogged ? logDate : false;
-    const nextLoggedByDay = {
-      ...loggedByDay,
-      [system]: {
-        ...loggedByDay[system],
-        [day]: newValue
-      }
-    };
     const workout = SYSTEMS[system]?.workouts?.[SYSTEMS[system].type === "weekly" ? SYSTEMS[system].schedule[day] : day];
     const nextLogsByDate = {
       ...logsByDate
     };
-    if (!wasLogged && logDate) {
-      // Logging: add this workout to whatever's already logged for that date — never
-      // replaces an existing entry, so logging a 2nd (or 3rd) workout the same day keeps
-      // all of them, instead of only the most recent one surviving.
-      const existing = nextLogsByDate[logDate]?.workouts || [];
-      nextLogsByDate[logDate] = {
-        ...nextLogsByDate[logDate],
-        workouts: [...existing, {
-          system,
-          day,
-          title: workout?.title || day
-        }]
-      };
-    } else {
-      // Un-logging: remove only this specific system+day entry from whichever date it
-      // was logged under, leaving any other workouts logged that same day untouched.
-      const priorDate = typeof loggedByDay[system]?.[day] === "string" ? loggedByDay[system][day] : null;
-      if (priorDate && nextLogsByDate[priorDate]?.workouts) {
-        const filtered = nextLogsByDate[priorDate].workouts.filter(w => !(w.system === system && w.day === day));
-        nextLogsByDate[priorDate] = {
-          ...nextLogsByDate[priorDate],
-          workouts: filtered
-        };
-      }
-    }
-    setLoggedByDay(nextLoggedByDay);
+
+    // Always adds to whatever's already logged for that date — never replaces an existing
+    // entry, so logging a 2nd (or 3rd) workout the same day keeps all of them.
+    const existing = nextLogsByDate[logDate]?.workouts || [];
+    nextLogsByDate[logDate] = {
+      ...nextLogsByDate[logDate],
+      workouts: [...existing, {
+        system,
+        day,
+        title: workout?.title || day
+      }]
+    };
     setLogsByDate(nextLogsByDate);
     setBackendStatus("saving");
     try {
       await mergeAndPushBackendState({
         stats,
-        loggedByDay: nextLoggedByDay,
+        logsByDate: nextLogsByDate
+      });
+      setBackendStatus("saved");
+    } catch (e) {
+      setBackendStatus("error");
+      setBackendError(e.message || "Save failed.");
+    }
+  };
+
+  // Removes one specific logged workout from a given calendar date (from the Overview
+  // calendar's delete button) — leaves any other workouts logged that same day untouched.
+  const handleDeleteWorkout = async (date, index) => {
+    const nextLogsByDate = {
+      ...logsByDate
+    };
+    const workouts = [...(nextLogsByDate[date]?.workouts || [])];
+    workouts.splice(index, 1);
+    nextLogsByDate[date] = {
+      ...nextLogsByDate[date],
+      workouts
+    };
+    setLogsByDate(nextLogsByDate);
+    setBackendStatus("saving");
+    try {
+      await mergeAndPushBackendState({
+        stats,
         logsByDate: nextLogsByDate
       });
       setBackendStatus("saved");
@@ -3716,9 +4075,9 @@ export default function HealthDashboard() {
   const stressScore = healthData?.["Stress Score"] ?? "—";
   const backendStatusLabel = {
     loading: "Loading synced data…",
-    ready: "Synced across devices",
+    ready: "",
     saving: "Saving…",
-    saved: "Saved — synced across devices",
+    saved: "Saved",
     error: backendError || "Sync error — changes are only saved on this device right now"
   }[backendStatus];
   return /*#__PURE__*/_jsx("div", {
@@ -3726,13 +4085,14 @@ export default function HealthDashboard() {
     children: /*#__PURE__*/_jsxs("div", {
       className: "max-w-2xl mx-auto flex flex-col gap-5",
       children: [/*#__PURE__*/_jsxs("header", {
+        className: "text-center",
         children: [/*#__PURE__*/_jsx("h1", {
           className: "text-lg font-bold tracking-tight",
-          children: "Health Dashboard"
+          children: "RVSH Health Dashboard"
         }), /*#__PURE__*/_jsx("p", {
           className: "text-xs text-orange-300 italic",
           children: healthData?.motivationalMessage || "Your daily motivation lands here once Cowork's next sync runs."
-        }), /*#__PURE__*/_jsx("p", {
+        }), backendStatusLabel && /*#__PURE__*/_jsx("p", {
           className: `text-[11px] mt-0.5 ${backendStatus === "error" ? "text-red-400" : "text-zinc-600"}`,
           children: backendStatusLabel
         })]
@@ -3755,9 +4115,9 @@ export default function HealthDashboard() {
           stressScore: stressScore,
           stats: stats,
           setStats: saveStats,
-          logsByDate: logsByDate
+          logsByDate: logsByDate,
+          onDeleteWorkout: handleDeleteWorkout
         }), tab === "workout" && /*#__PURE__*/_jsx(WorkoutTab, {
-          loggedByDay: loggedByDay,
           onToggleLog: handleToggleLog,
           workoutParams: workoutParams,
           onParamChange: handleParamChange
@@ -3769,7 +4129,9 @@ export default function HealthDashboard() {
         }), tab === "sleep" && /*#__PURE__*/_jsx(SleepTab, {
           healthData: healthData,
           sleepScore: sleepScore
-        }), tab === "trends" && /*#__PURE__*/_jsx(TrendsTab, {})]
+        }), tab === "trends" && /*#__PURE__*/_jsx(TrendsTab, {
+          logsByDate: logsByDate
+        })]
       })]
     })
   });
