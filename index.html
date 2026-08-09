@@ -3362,7 +3362,8 @@ const SLEEP_TIMELINE = [{
 }];
 function SleepTab({
   healthData,
-  sleepScore
+  sleepScore,
+  logsByDate
 }) {
   const quality = healthData?.["Sleep Quality"] ?? "—";
   const duration = healthData?.["Sleep Duration"] ?? "—";
@@ -3410,6 +3411,32 @@ function SleepTab({
     value: healthData?.["Avg Overnight HRV"] ?? "—",
     unit: healthData?.["Avg Overnight HRV"] ? "ms" : ""
   }];
+
+  // Last 7 calendar days (today back through 6 days ago), each paired with its
+  // per-day sleepDetail snapshot from logsByDate if one was ever backfilled/synced.
+  // A day with only a sleepScore (no detail) still shows the score honestly rather
+  // than hiding the row; a day with neither shows "No data" instead of a fabricated row.
+  const todayForWeek = new Date();
+  const todayKeyForWeek = dateKey(todayForWeek);
+  const weekSleepDays = Array.from({
+    length: 7
+  }, (_, i) => {
+    const d = new Date(todayForWeek);
+    d.setDate(todayForWeek.getDate() - (6 - i));
+    const key = dateKey(d);
+    const entry = logsByDate?.[key];
+    return {
+      key,
+      label: d.toLocaleDateString("default", {
+        weekday: "short",
+        month: "short",
+        day: "numeric"
+      }),
+      isToday: key === todayKeyForWeek,
+      score: entry?.sleepScore ?? null,
+      detail: entry?.sleepDetail ?? null
+    };
+  });
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-6",
     children: [/*#__PURE__*/_jsxs("div", {
@@ -3510,6 +3537,61 @@ function SleepTab({
           })]
         })]
       }, m.label))
+    }), /*#__PURE__*/_jsxs("div", {
+      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-1",
+      children: [/*#__PURE__*/_jsx("span", {
+        className: "text-sm font-semibold text-zinc-200 mb-2",
+        children: "This Week"
+      }), /*#__PURE__*/_jsx("div", {
+        className: "flex flex-col divide-y divide-zinc-800",
+        children: weekSleepDays.map(day => /*#__PURE__*/_jsx("div", {
+          className: "py-3 first:pt-0 last:pb-0",
+          children: day.detail ? /*#__PURE__*/_jsxs("div", {
+            children: [/*#__PURE__*/_jsxs("div", {
+              className: "flex items-center justify-between mb-1",
+              children: [/*#__PURE__*/_jsx("span", {
+                className: `text-xs font-medium ${day.isToday ? "text-zinc-200" : "text-zinc-400"}`,
+                children: day.label
+              }), /*#__PURE__*/_jsxs("span", {
+                className: "font-mono text-sm font-bold text-cyan-400",
+                children: [day.score ?? "—", /*#__PURE__*/_jsx("span", {
+                  className: "text-zinc-600 text-[10px] font-normal",
+                  children: " /100"
+                })]
+              })]
+            }), /*#__PURE__*/_jsxs("div", {
+              className: "text-[11px] text-zinc-500",
+              children: [day.detail.quality, " \xB7 ", day.detail.duration, " \xB7 ", day.detail.bedtime, "–", day.detail.wakeTime]
+            }), /*#__PURE__*/_jsxs("div", {
+              className: "flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-zinc-600 mt-1",
+              children: [/*#__PURE__*/_jsxs("span", {
+                children: ["RHR ", day.detail.restingHR]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["Battery ", day.detail.bodyBatteryChange]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["SpO2 ", day.detail.avgSpO2, "/", day.detail.lowestSpO2]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["Resp ", day.detail.avgRespiration, "/", day.detail.lowestRespiration]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["HRV ", day.detail.avgOvernightHRV]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["Stress ", day.detail.stressScore]
+              }), /*#__PURE__*/_jsxs("span", {
+                children: ["Restless ", day.detail.restlessMoments]
+              })]
+            })]
+          }) : /*#__PURE__*/_jsxs("div", {
+            className: "flex items-center justify-between",
+            children: [/*#__PURE__*/_jsx("span", {
+              className: `text-xs font-medium ${day.isToday ? "text-zinc-200" : "text-zinc-400"}`,
+              children: day.label
+            }), /*#__PURE__*/_jsx("span", {
+              className: "text-[11px] text-zinc-600",
+              children: day.score != null ? `Score ${day.score} \xB7 detail not synced` : "No data"
+            })]
+          })
+        }, day.key))
+      })]
     })]
   });
 }
@@ -4174,7 +4256,8 @@ export default function HealthDashboard() {
           onSync: syncHealthData
         }), tab === "sleep" && /*#__PURE__*/_jsx(SleepTab, {
           healthData: healthData,
-          sleepScore: sleepScore
+          sleepScore: sleepScore,
+          logsByDate: logsByDate
         }), tab === "trends" && /*#__PURE__*/_jsx(TrendsTab, {
           logsByDate: logsByDate
         })]
