@@ -3180,19 +3180,29 @@ function WorkoutTab({
     })]
   });
 }
-function macroPct(item) {
-  const total = item.carbsPct + item.fatPct + item.proteinPct;
-  return total === 0 ? "" : `Carbs ${item.carbsPct}% Fat ${item.fatPct}% Protein ${item.proteinPct}%`;
+
+// Shows a meal's macro breakdown in grams — read directly from synced data (carbsG/fatG/
+// proteinG), not estimated. Blank if that meal's sync didn't capture grams.
+function macroGramsLabel(item) {
+  if (item.carbsG == null || item.fatG == null || item.proteinG == null) return "";
+  return `Carbs ${item.carbsG}g Fat ${item.fatG}g Protein ${item.proteinG}g`;
 }
 
-// Estimates grams of each macro for a meal from its calories + macro percentages
-// (carbs/protein = 4 kcal/g, fat = 9 kcal/g). The source data only stores percentages
-// per meal, not measured grams, so this is a computed estimate, not a synced figure.
+// Pulls a meal's macro grams straight from synced data. Returns null for a macro (not 0)
+// when it wasn't captured at sync time — "unknown" and "genuinely zero" are different
+// things and shouldn't look the same on a chart.
 function mealMacroGrams(meal) {
+  if (meal.carbsG == null || meal.fatG == null || meal.proteinG == null) {
+    return {
+      carbs: null,
+      fat: null,
+      protein: null
+    };
+  }
   return {
-    carbs: Math.round(meal.kcal * (meal.carbsPct || 0) / 100 / 4),
-    fat: Math.round(meal.kcal * (meal.fatPct || 0) / 100 / 9),
-    protein: Math.round(meal.kcal * (meal.proteinPct || 0) / 100 / 4)
+    carbs: meal.carbsG,
+    fat: meal.fatG,
+    protein: meal.proteinG
   };
 }
 function NutritionTab({
@@ -3290,7 +3300,7 @@ function NutritionTab({
             })]
           }), /*#__PURE__*/_jsx("div", {
             className: "text-[11px] text-zinc-500 mt-0.5",
-            children: macroPct(m)
+            children: macroGramsLabel(m)
           })]
         }), /*#__PURE__*/_jsx("div", {
           className: "flex flex-col divide-y divide-zinc-800/70",
@@ -3550,11 +3560,23 @@ function WeekLineChart({
   points
 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
+  const [hidden, setHidden] = useState(() => new Set());
   const width = 320;
   const height = 96;
   const padTop = 10;
   const padBottom = 8;
-  const allVals = series.flatMap(s => points.map(p => p.values[s.key]).filter(v => v != null));
+  const toggleSeries = key => {
+    setHidden(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);else next.add(key);
+      return next;
+    });
+  };
+
+  // When every series is toggled off, fall back to showing all of them rather than an
+  // empty chart — that state is confusing, not useful.
+  const visibleSeries = series.length > 1 && series.some(s => !hidden.has(s.key)) ? series.filter(s => !hidden.has(s.key)) : series;
+  const allVals = visibleSeries.flatMap(s => points.map(p => p.values[s.key]).filter(v => v != null));
   const max = allVals.length ? Math.max(...allVals) : 1;
   const min = allVals.length ? Math.min(...allVals) : 0;
   const range = max - min || 1;
@@ -3562,8 +3584,13 @@ function WeekLineChart({
   // No horizontal padding here on purpose — dot i sits at exactly i/(n-1) of the width,
   // the same fraction the day-label row (justify-between), the hover zones (7 equal
   // flex-1 slices), and the tooltip's left:% all use. Padding this differently from
-  // those was the earlier bug: dots visually drifted from their labels, and hovering
+  // those was one earlier bug: dots visually drifted from their labels, and hovering
   // near a real dot could resolve to a neighboring (sometimes empty) day instead.
+  // A second, separate bug lived in the <svg> tag itself: without preserveAspectRatio="none",
+  // the browser defaults to centering the viewBox with letterbox margins whenever the
+  // rendered box's aspect ratio doesn't match the viewBox's — which is exactly what a wide
+  // desktop card does (this stayed invisible on narrow mobile widths, where the aspect
+  // ratios happen to be close enough that the margin was too small to notice).
   const stepX = width / (points.length - 1);
   const toX = i => i * stepX;
   const toY = v => height - padBottom - (v - min) / (range || 1) * (height - padTop - padBottom);
@@ -3578,15 +3605,21 @@ function WeekLineChart({
           children: title
         }), series.length > 1 && /*#__PURE__*/_jsx("div", {
           className: "flex items-center gap-2",
-          children: series.map(s => /*#__PURE__*/_jsxs("span", {
-            className: "flex items-center gap-1 text-[10px] text-zinc-500",
-            children: [/*#__PURE__*/_jsx("span", {
-              className: "w-2 h-2 rounded-full inline-block",
-              style: {
-                backgroundColor: s.color
-              }
-            }), " ", s.label]
-          }, s.key))
+          children: series.map(s => {
+            const isHidden = hidden.has(s.key) && visibleSeries.length < series.length;
+            return /*#__PURE__*/_jsxs("button", {
+              onClick: () => toggleSeries(s.key),
+              className: `flex items-center gap-1 text-[10px] transition-opacity ${isHidden ? "text-zinc-700 opacity-50" : "text-zinc-500"}`,
+              title: isHidden ? `Show ${s.label}` : `Hide ${s.label}`,
+              children: [/*#__PURE__*/_jsx("span", {
+                className: "w-2 h-2 rounded-full inline-block",
+                style: {
+                  backgroundColor: s.color,
+                  opacity: isHidden ? 0.4 : 1
+                }
+              }), " ", s.label]
+            }, s.key);
+          })
         })]
       }), unit && /*#__PURE__*/_jsx("span", {
         className: "text-[10px] text-zinc-600",
@@ -3602,6 +3635,7 @@ function WeekLineChart({
       },
       children: [/*#__PURE__*/_jsxs("svg", {
         viewBox: `0 0 ${width} ${height}`,
+        preserveAspectRatio: "none",
         className: "w-full h-full overflow-visible",
         children: [hoverIdx !== null && /*#__PURE__*/_jsx("line", {
           x1: toX(hoverIdx),
@@ -3611,7 +3645,7 @@ function WeekLineChart({
           stroke: "#3f3f46",
           strokeWidth: "1",
           strokeDasharray: "3,3"
-        }), series.map(s => {
+        }), visibleSeries.map(s => {
           const coords = points.map((p, i) => p.values[s.key] != null ? {
             x: toX(i),
             y: toY(p.values[s.key])
@@ -3648,14 +3682,14 @@ function WeekLineChart({
         children: [/*#__PURE__*/_jsx("div", {
           className: "text-zinc-500 mb-0.5",
           children: points[hoverIdx].label
-        }), series.map(s => /*#__PURE__*/_jsxs("div", {
+        }), visibleSeries.map(s => /*#__PURE__*/_jsxs("div", {
           className: "flex items-center gap-1.5 text-zinc-200",
           children: [/*#__PURE__*/_jsx("span", {
             className: "w-1.5 h-1.5 rounded-full inline-block flex-shrink-0",
             style: {
               backgroundColor: s.color
             }
-          }), series.length > 1 && /*#__PURE__*/_jsxs("span", {
+          }), visibleSeries.length > 1 && /*#__PURE__*/_jsxs("span", {
             className: "text-zinc-500",
             children: [s.label, ":"]
           }), /*#__PURE__*/_jsxs("span", {
@@ -3703,20 +3737,27 @@ function TrendsTab({
   const consumedFor = entry => {
     if (!entry?.nutrition) return null;
     const meals = entry.nutrition.meals || [];
-    return meals.reduce((acc, m) => {
+    let calories = 0,
+      carbs = 0,
+      fat = 0,
+      protein = 0,
+      hasMacroData = false;
+    meals.forEach(m => {
+      calories += m.kcal || 0;
       const g = mealMacroGrams(m);
-      return {
-        calories: acc.calories + (m.kcal || 0),
-        carbs: acc.carbs + g.carbs,
-        fat: acc.fat + g.fat,
-        protein: acc.protein + g.protein
-      };
-    }, {
-      calories: 0,
-      carbs: 0,
-      fat: 0,
-      protein: 0
+      if (g.carbs != null) {
+        carbs += g.carbs;
+        fat += g.fat;
+        protein += g.protein;
+        hasMacroData = true;
+      }
     });
+    return {
+      calories,
+      carbs: hasMacroData ? carbs : null,
+      fat: hasMacroData ? fat : null,
+      protein: hasMacroData ? protein : null
+    };
   };
 
   // Each chart's points share the same shape: { label, isToday, values: { seriesKey: number|null } }
