@@ -6,7 +6,7 @@
 <title>RVSH Health Dashboard</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
-  html, body { background: #09090b; margin: 0; }
+  html, body { background: #ede8dc; margin: 0; }
 </style>
 
 <script type="importmap">
@@ -54,9 +54,9 @@ import ReactDOM from "react-dom/client";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { Home, Dumbbell, Apple, TrendingUp, Moon, Zap, Scale, Percent, Activity, RefreshCw, Check, Plus, X, Footprints, Heart, BatteryCharging, Wind, AlertCircle } from "lucide-react";
 
-// Apps Script backend — the single shared cross-device store for everything: manual
+// Apps Script backend â the single shared cross-device store for everything: manual
 // entries (body stats, workout log history) AND the latest Garmin/MyFitnessPal pull.
-// (The old published-CSV Sheet link has been retired — no longer used anywhere.)
+// (The old published-CSV Sheet link has been retired â no longer used anywhere.)
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4a7Sbu6D_kustd0GR1L-1EjW_ApGuEbP0LCVHtL8OaAH3-fNorGbFAGu_tdW_2gPh5w/exec";
 const APPS_SCRIPT_SECRET = "rashidin-health-dash-7k2m9x";
@@ -70,7 +70,7 @@ async function fetchBackendState() {
 }
 
 // Overwrites the shared state blob on the backend with the full current picture.
-// Uses text/plain on purpose — application/json would trigger a CORS preflight
+// Uses text/plain on purpose â application/json would trigger a CORS preflight
 // (an OPTIONS request) that Apps Script doesn't handle, breaking the save silently.
 async function pushBackendState(data) {
   const res = await fetch(APPS_SCRIPT_URL, {
@@ -92,7 +92,7 @@ async function pushBackendState(data) {
 // The ONLY safe way to write a partial update (e.g. just the new stats, or just an
 // updated logsByDate). pushBackendState does a full overwrite with no server-side
 // merge, so writing local-only fields directly would silently erase anything not
-// included — e.g. healthData, which none of the dashboard's own save actions know
+// included â e.g. healthData, which none of the dashboard's own save actions know
 // about. This fetches the absolute latest backend state first and layers the partial
 // update on top of it, so nothing already saved (by Sync, by another device, by a
 // Cowork push) is ever dropped.
@@ -107,10 +107,10 @@ async function mergeAndPushBackendState(partial) {
 }
 
 // ---- Design tokens ----
-// Background: zinc-950 / zinc-900 (near-black, lets accents read as signal, not decoration)
-// Accent A (Workout / energy):  lime-400
-// Accent B (Nutrition / fuel):  orange-500
-// Accent C (Recovery / vitals): cyan-400
+// Background: #ede8dc / #f6f3ea (warm cream, lets accents read as signal, not decoration)
+// Accent A (Workout / energy):  [#B8860B]
+// Accent B (Nutrition / fuel):  [#B00020]
+// Accent C (Recovery / vitals): [#0047AB]
 // Stat numbers set in font-mono to read like a tracker display; labels in uppercase tracking-wide
 
 const TABS = [{
@@ -136,7 +136,7 @@ const TABS = [{
 }];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Formats a JS Date as YYYY-MM-DD — the key used throughout for tying a log entry to a real calendar day.
+// Formats a JS Date as YYYY-MM-DD â the key used throughout for tying a log entry to a real calendar day.
 function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -179,7 +179,7 @@ const SYSTEMS = {
           sets: "6 x 10",
           rest: "45-60 sec"
         }, {
-          name: "Seated Dumbbell Lateral Raise (45°)",
+          name: "Seated Dumbbell Lateral Raise (45Â°)",
           sets: "6 x 10",
           rest: "45-60 sec"
         }, {
@@ -241,7 +241,7 @@ const SYSTEMS = {
         exercises: [{
           name: "Hip Hinge Movement",
           sets: "1 x 100",
-          rest: "—"
+          rest: "â"
         }, {
           name: "Diagonal Walk w/ Knee Band",
           sets: "4 x 15",
@@ -358,7 +358,7 @@ const SYSTEMS = {
       },
       activeRest: {
         title: "Active Rest",
-        note: "Light movement — walk, mobility, or easy cardio. No structured lifting today."
+        note: "Light movement â walk, mobility, or easy cardio. No structured lifting today."
       },
       rest: {
         title: "Rest",
@@ -372,21 +372,21 @@ const SYSTEMS = {
     order: ["D1", "D2", "D3", "D4"],
     workouts: {
       D1: {
-        title: "Lower Body — Squat Focus",
+        title: "Lower Body â Squat Focus",
         sections: [{
           name: "Warm Up",
           exercises: [{
             name: "T-Spine Flexion ISO Diaphragmatic Breathing",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman Lunge with Rotation",
             sets: "1 x 4 each side",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Foam Roller T-Spine Extensions",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Heels Elevated Toe Touch Squat ISO",
             sets: "1 x 5",
@@ -397,11 +397,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Deep Squat Calf Raises",
             sets: "2 x 10",
-            rest: "—"
+            rest: "â"
           }, {
-            name: "Seated L-Sit Leg Raise – Compressed",
+            name: "Seated L-Sit Leg Raise â Compressed",
             sets: "2 x 8-10 each @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Power Development",
@@ -415,7 +415,7 @@ const SYSTEMS = {
           exercises: [{
             name: "BB High Bar Back Squat",
             sets: "4 x 8 @ 7 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Supported SL Bent Runner Calf Raise ISO",
             sets: "3 x 20-30 sec each @ 9 RPE",
@@ -426,7 +426,7 @@ const SYSTEMS = {
           exercises: [{
             name: "BB Hip Thrust",
             sets: "3 x 12 @ 7 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "1KB Goblet Deficit Staggered Squat",
             sets: "3 x 8 each @ 8 RPE",
@@ -437,7 +437,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Supported Sissy Squat",
             sets: "3 x 5-6 @ 8-9 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Reverse Crunch off Bench",
             sets: "3 x 8-12 @ 8 RPE",
@@ -463,34 +463,34 @@ const SYSTEMS = {
           exercises: [{
             name: "Roll to Straddle",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Glute Bridge w/ Alternating Diagonal Overhead Reaches",
             sets: "1 x 6 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman with ER ISO Hold",
             sets: "40 sec each",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
       D2: {
-        title: "Upper Body — Bench Focus",
+        title: "Upper Body â Bench Focus",
         sections: [{
           name: "Warm Up",
           exercises: [{
             name: "T-Spine Flexion ISO Diaphragmatic Breathing",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman Lunge with Rotation",
             sets: "1 x 4 each side",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Foam Roller T-Spine Extensions",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Heels Elevated Toe Touch Squat ISO",
             sets: "1 x 5",
@@ -501,11 +501,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Standing 90/90 Band/Cable External Rotation",
             sets: "2 x 10 each @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Standing Halo",
             sets: "2 x 8 each @ 8 RPE",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Power Development",
@@ -519,9 +519,9 @@ const SYSTEMS = {
           exercises: [{
             name: "BB Bench Press",
             sets: "4 x 6 @ 7 RPE",
-            rest: "—"
+            rest: "â"
           }, {
-            name: "2DB Seated Reverse Flye – Pronated",
+            name: "2DB Seated Reverse Flye â Pronated",
             sets: "3 x 10 @ 8 RPE",
             rest: "60 sec"
           }]
@@ -530,7 +530,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Single Arm DB Bench Supported Row",
             sets: "3 x 10 each @ 8 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2DB Tall Kneeling Alt. Arnold Press",
             sets: "3 x 8 each @ 8 RPE",
@@ -541,7 +541,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Weight Plate Front Raise",
             sets: "3 x 10 @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Single Arm DB Preacher Hammer Curl",
             sets: "3 x 10 each @ 9 RPE",
@@ -559,34 +559,34 @@ const SYSTEMS = {
           exercises: [{
             name: "Cobra to Neck Rotations",
             sets: "1 x 8 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Crab Stretch",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Band Lat Stretch",
             sets: "45 sec each",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
       D3: {
-        title: "Lower Body — Deadlift Focus",
+        title: "Lower Body â Deadlift Focus",
         sections: [{
           name: "Warm Up",
           exercises: [{
             name: "T-Spine Flexion ISO Diaphragmatic Breathing",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman Lunge with Rotation",
             sets: "1 x 4 each side",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Foam Roller T-Spine Extensions",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Heels Elevated Toe Touch Squat ISO",
             sets: "1 x 5",
@@ -597,11 +597,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Split Squat with Band RNT",
             sets: "2 x 10 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Side Plank Series",
             sets: "2 x 30 sec each @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Power Development",
@@ -615,9 +615,9 @@ const SYSTEMS = {
           exercises: [{
             name: "BB Conventional Deadlift",
             sets: "4 x 4 @ 7 RPE",
-            rest: "—"
+            rest: "â"
           }, {
-            name: "Copenhagen Plank – Short Lever",
+            name: "Copenhagen Plank â Short Lever",
             sets: "3 x 20-30 sec each @ 8 RPE",
             rest: "60 sec"
           }]
@@ -626,7 +626,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Rear Foot Elevated Split Squat (single arm KB)",
             sets: "3 x 8 each @ 8 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Stability Ball Hamstring Curl Series",
             sets: "3 x 10 @ 9 RPE",
@@ -637,7 +637,7 @@ const SYSTEMS = {
           exercises: [{
             name: "1DB Goblet Curtsy Lunge",
             sets: "3 x 8 each @ 8 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Band/Cable Bent Over Horizontal Chop",
             sets: "3 x 8 each @ 8 RPE",
@@ -667,34 +667,34 @@ const SYSTEMS = {
           exercises: [{
             name: "Roll to Straddle",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Glute Bridge w/ Alternating Diagonal Overhead Reaches",
             sets: "1 x 6 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman with ER ISO Hold",
             sets: "40 sec each",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
       D4: {
-        title: "Upper Body — Overhead Press Focus",
+        title: "Upper Body â Overhead Press Focus",
         sections: [{
           name: "Warm Up",
           exercises: [{
             name: "T-Spine Flexion ISO Diaphragmatic Breathing",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Spiderman Lunge with Rotation",
             sets: "1 x 4 each side",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Foam Roller T-Spine Extensions",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Heels Elevated Toe Touch Squat ISO",
             sets: "1 x 5",
@@ -705,11 +705,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Wall Supported Hip Flexion to SL Deadlift",
             sets: "2 x 8 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Crunch ISO w/ Heel Touches",
             sets: "2 x 10-15 each @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Power Development",
@@ -723,7 +723,7 @@ const SYSTEMS = {
           exercises: [{
             name: "BB Military Press",
             sets: "4 x 5 @ 7 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Band/Cable Seated Pronated High Row",
             sets: "3 x 10 @ 8 RPE",
@@ -734,7 +734,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Pushup",
             sets: "3 x 6 @ 8 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Lat Pulldown",
             sets: "3 x 8 @ 8 RPE",
@@ -745,7 +745,7 @@ const SYSTEMS = {
           exercises: [{
             name: "2DB Incline Curl",
             sets: "3 x 12 @ 9 RPE",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Standing Single Arm Band/Cable Upright Triceps Kickback",
             sets: "3 x 12 each @ 8 RPE",
@@ -763,15 +763,15 @@ const SYSTEMS = {
           exercises: [{
             name: "Cobra to Neck Rotations",
             sets: "1 x 8 each",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Crab Stretch",
             sets: "1 x 8",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Band Lat Stretch",
             sets: "45 sec each",
-            rest: "—"
+            rest: "â"
           }]
         }]
       }
@@ -790,11 +790,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Hack Squat",
             sets: "3 x 15",
-            rest: "90 sec · 1.5 rep variation"
+            rest: "90 sec Â· 1.5 rep variation"
           }, {
             name: "Squat Press",
             sets: "3 x 15",
-            rest: "90 sec · 2-sec pause reps"
+            rest: "90 sec Â· 2-sec pause reps"
           }, {
             name: "3a. Leg Extension",
             sets: "10/10/10",
@@ -802,11 +802,11 @@ const SYSTEMS = {
           }, {
             name: "3b. Walking Lunges",
             sets: "10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3c. Body Weight Squats",
             sets: "10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3d. Walking Lunges",
             sets: "10",
@@ -824,7 +824,7 @@ const SYSTEMS = {
           exercises: [{
             name: "5a. Hanging Leg Raises",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5b. Lying Leg Raises",
             sets: "Failure",
@@ -856,7 +856,7 @@ const SYSTEMS = {
           }, {
             name: "3b. Pushups",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Shoulders",
@@ -867,7 +867,7 @@ const SYSTEMS = {
           }, {
             name: "4b. Lying Upright Cable Rows",
             sets: "3 x 12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5a. Lying Cable Side Raise",
             sets: "3 x 12",
@@ -875,7 +875,7 @@ const SYSTEMS = {
           }, {
             name: "5b. Lying Cable Front Raise",
             sets: "3 x 12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6a. Bent-Over Cable Rear Delt Raise",
             sets: "3 x 10",
@@ -895,15 +895,15 @@ const SYSTEMS = {
           exercises: [{
             name: "1a. Reverse-Grip Cable Tricep Pushdown",
             sets: "3 x 12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "1b. Cable Overhead Tricep Extension",
             sets: "3 x 12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2a. Single-Arm Overhead Rope Extensions",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Single-Arm Rope Kickbacks",
             sets: "3 x 10",
@@ -915,14 +915,14 @@ const SYSTEMS = {
           }, {
             name: "3b. Elevated Bench Dips",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Biceps",
           exercises: [{
             name: "4a. EZ-Bar Spider Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Standing EZ-Bar Curls (narrow grip)",
             sets: "3 x 10",
@@ -930,7 +930,7 @@ const SYSTEMS = {
           }, {
             name: "5a. Reverse-Grip Dumbbell Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5b. Hammer Curls",
             sets: "3 x 10",
@@ -938,7 +938,7 @@ const SYSTEMS = {
           }, {
             name: "6a. Lying Cable Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6b. Standing Alternating Cable Curls",
             sets: "3 x 10-12",
@@ -965,7 +965,7 @@ const SYSTEMS = {
           }, {
             name: "2b. Glute Ham Raises",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Stiff-Legged Cable Deadlifts",
             sets: "3 x 10",
@@ -976,7 +976,7 @@ const SYSTEMS = {
           exercises: [{
             name: "4a. Decline Cross-Body Situp",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Conventional Cross-Body Situp",
             sets: "Failure",
@@ -992,31 +992,31 @@ const SYSTEMS = {
           exercises: [{
             name: "Lat Pulldown",
             sets: "3 x 10",
-            rest: "60 sec · vinyl handles on straight-bar"
+            rest: "60 sec Â· vinyl handles on straight-bar"
           }, {
             name: "2a. Pullups",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Rope Lat Pulldowns",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3a. Single-Arm Dumbbell Row",
             sets: "3 x 10 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3b. Single-Arm Inverted Row",
             sets: "3 x 10 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4a. Dumbbell Pullovers",
             sets: "3 x 15",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Standing Dumbbell Shrugs",
             sets: "3 x 15",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Calves",
@@ -1065,11 +1065,11 @@ const SYSTEMS = {
           exercises: [{
             name: "5a. Lying Incline Leg Raises",
             sets: "3 x 15",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5b. Exercise Ball Knee Tuck",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5c. Bodyweight Plank",
             sets: "3 x 30 sec hold",
@@ -1124,7 +1124,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Overhead Triceps Extensions",
             sets: "3 x 15",
-            rest: "60 sec · band to failure on set 3"
+            rest: "60 sec Â· band to failure on set 3"
           }, {
             name: "Seated Rope Extensions",
             sets: "3 x 10/10/10",
@@ -1132,22 +1132,22 @@ const SYSTEMS = {
           }, {
             name: "Dips",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Biceps",
           exercises: [{
             name: "4a. EZ-Bar Spider Curls",
             sets: "3 x 10-12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Standing Banded Biceps Curl",
             sets: "3 x 10-12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5a. Low Cable EZ-Bar Curls",
             sets: "3 x 10-12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5b. Low Banded Biceps Curl",
             sets: "3 x 8-10",
@@ -1155,7 +1155,7 @@ const SYSTEMS = {
           }, {
             name: "6a. Incline Dumbbell Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6b. Seated Banded Biceps Curl",
             sets: "3 x 10",
@@ -1175,18 +1175,18 @@ const SYSTEMS = {
           }, {
             name: "2a. Rack Deadlifts",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Banded Good Mornings",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Hamstrings",
           exercises: [{
             name: "Lying Hamstring Curl",
             sets: "20, 10/10, 10/10/10",
-            rest: "60 sec · progressive drop sets"
+            rest: "60 sec Â· progressive drop sets"
           }, {
             name: "Standing Cable Hamstring Curl",
             sets: "3 x 20,15,10 each leg",
@@ -1201,7 +1201,7 @@ const SYSTEMS = {
           }, {
             name: "5b. Barbell Rollouts",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5c. Crunches",
             sets: "3 x 10",
@@ -1225,11 +1225,11 @@ const SYSTEMS = {
           }, {
             name: "Supported Smith Machine Row",
             sets: "3 x 10/10",
-            rest: "90 sec · drop sets"
+            rest: "90 sec Â· drop sets"
           }, {
             name: "4a. Cable Straight-Arm Pulldown",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. High-Pulley Cable Row",
             sets: "3 x 10",
@@ -1268,7 +1268,7 @@ const SYSTEMS = {
           }, {
             name: "2b. Hex Bar Squat",
             sets: "3 x 25",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Bulgarian Split Squat",
             sets: "3 x 20 each leg",
@@ -1290,11 +1290,11 @@ const SYSTEMS = {
           exercises: [{
             name: "6a. Captain's Chair Leg Raises",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6b. Medicine Ball Pass",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6c. Cross-body Mountain Climbers",
             sets: "Failure",
@@ -1314,15 +1314,15 @@ const SYSTEMS = {
           }, {
             name: "2a. Incline Close-grip Dumbbell Press",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Incline Dumbbell Press",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3a. Rollout Fly",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3b. Pushups",
             sets: "3 x 10",
@@ -1345,11 +1345,11 @@ const SYSTEMS = {
           }, {
             name: "Single-Arm Landmine Shoulder Press",
             sets: "3 x 20 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "8a. Single-Arm Bentover Rear Delt Raise",
             sets: "3 x 10-12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "8b. Single-Arm Rear Delt Raise (side)",
             sets: "3 x 10-12",
@@ -1384,23 +1384,23 @@ const SYSTEMS = {
           }, {
             name: "4b. Lying Cable Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5a. Lying High Cable Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5b. Standing High Cable Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6a. Reverse-Grip EZ-Bar Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6b. Close-Grip EZ-Bar Curls",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1416,7 +1416,7 @@ const SYSTEMS = {
           }, {
             name: "Dumbbell Stiff-Legged Deadlift",
             sets: "5 x 10",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Lower Back",
@@ -1438,15 +1438,15 @@ const SYSTEMS = {
           }, {
             name: "5b. Cross-Body Crunches",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5c. Exercise Ball Rollouts",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5d. Ab Twists",
             sets: "3 x 50",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1462,18 +1462,18 @@ const SYSTEMS = {
           }, {
             name: "Incline Straight-Arm Pullover",
             sets: "3 x 12",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Barbell Bentover Row",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Calves",
           exercises: [{
             name: "4a. Seated EZ-Bar Shrugs",
             sets: "3 x 20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Calf Press",
             sets: "5 x 20",
@@ -1501,7 +1501,7 @@ const SYSTEMS = {
           }, {
             name: "Single-Leg Press",
             sets: "5 x 15,15,15,12,6 each leg",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Single-Leg Hack Squat",
             sets: "5 x 10 each leg",
@@ -1527,7 +1527,7 @@ const SYSTEMS = {
           }, {
             name: "6b. Alternating Lying Leg Raises",
             sets: "3 x 10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "6c. Alternating Exercise Ball Knee Tucks",
             sets: "3 x 10",
@@ -1586,27 +1586,27 @@ const SYSTEMS = {
           exercises: [{
             name: "1a. Seated Single-Arm Dumbbell Curls",
             sets: "4 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "1b. Lying Single-Arm Overhead Dumbbell Extension",
             sets: "4 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2a. Incline Single-Arm Overhead Cable Extensions",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Single-Arm Cable Concentration Curls",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3a. Single-Arm Preacher Machine Curls",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3b. Single-Arm Cable Push-downs",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1644,11 +1644,11 @@ const SYSTEMS = {
           }, {
             name: "5b. Cable Cross-Body Pulls",
             sets: "15 each side",
-            rest: "—"
+            rest: "â"
           }, {
             name: "5c. Crunches",
             sets: "15 each side",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1664,22 +1664,22 @@ const SYSTEMS = {
           }, {
             name: "Single-Arm Cable Rows",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Single-Arm Smith Machine Shrugs",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Single-Arm Overhead Machine Pulldowns",
             sets: "3 x 15 each arm",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Calves",
           exercises: [{
             name: "Seated Single-Leg Calf Press",
             sets: "5 x 15 each leg",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1729,7 +1729,7 @@ const SYSTEMS = {
           }, {
             name: "5b. Lying Windshield Wipers",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1776,27 +1776,27 @@ const SYSTEMS = {
           exercises: [{
             name: "1a. Triceps Extensions",
             sets: "6 x 30,25,20,20,25,30",
-            rest: "—"
+            rest: "â"
           }, {
             name: "1b. Dumbbell Biceps Curl",
             sets: "6 x 20,15,10,10,15,20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2a. EZ Bar Skull Crushers",
             sets: "6 x 30,25,20,20,25,30",
-            rest: "—"
+            rest: "â"
           }, {
             name: "2b. Cable EZ Bar Preacher Curls",
             sets: "6 x 20,15,10,10,15,20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3a. Dips",
             sets: "6 x 30,25,20,20,25,30",
-            rest: "—"
+            rest: "â"
           }, {
             name: "3b. Hammer Curls",
             sets: "6 x 20,15,10,10,15,20",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1815,11 +1815,11 @@ const SYSTEMS = {
           exercises: [{
             name: "Lying Leg Curls (single leg)",
             sets: "6 x 30,20,10,10,20,30",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Seated Leg Curls",
             sets: "6 x 30,20,10,10,20,30",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Upper Abs",
@@ -1830,7 +1830,7 @@ const SYSTEMS = {
           }, {
             name: "4b. Exercise Ball Alternating Crunches",
             sets: "5 x 30",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1846,7 +1846,7 @@ const SYSTEMS = {
           }, {
             name: "T-Bar Rows",
             sets: "6 x 20,15,10,10,15,20",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Seated Machine Row",
             sets: "6 x 20,15,10,10,15,20",
@@ -1854,11 +1854,11 @@ const SYSTEMS = {
           }, {
             name: "4a. Machine Shrugs",
             sets: "6 x 30,20,10,10,20,30",
-            rest: "—"
+            rest: "â"
           }, {
             name: "4b. Calf Raise Machine",
             sets: "6 x 30,20,10,10,20,30",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -1944,7 +1944,7 @@ const SYSTEMS = {
           }, {
             name: "Dumbbell Lateral Raise",
             sets: "3 x 30,20,10",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Seated Side Lateral Dumbbell Raises",
             sets: "3 x 10,15,20",
@@ -2034,7 +2034,7 @@ const SYSTEMS = {
           }, {
             name: "7b. Ab Wheel Rollouts",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2116,7 +2116,7 @@ const SYSTEMS = {
           }, {
             name: "3b. Flat Bench Lying Leg Raise",
             sets: "Failure",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2284,18 +2284,18 @@ const SYSTEMS = {
           exercises: [{
             name: "Hack Squats",
             sets: "5 x 10,15,20,25,30",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Leg Press",
             sets: "5 x 30,25,20,15,10",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }, {
           name: "Calves & Lower Abs",
           exercises: [{
             name: "3a. Seated Calf Raises",
             sets: "5 x 30,25,20,15,10",
-            rest: "60→50→40→30 sec by superset"
+            rest: "60â50â40â30 sec by superset"
           }, {
             name: "3b. Decline Lying Leg Raises",
             sets: "5 x 30,25,20,15,10",
@@ -2303,11 +2303,11 @@ const SYSTEMS = {
           }, {
             name: "4a. Decline Lying Leg Raises",
             sets: "5 x 10,15,20,25,30",
-            rest: "20→30→40→50 sec by superset"
+            rest: "20â30â40â50 sec by superset"
           }, {
             name: "4b. Seated Calf Raises",
             sets: "5 x 10,15,20,25,30",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2319,22 +2319,22 @@ const SYSTEMS = {
           exercises: [{
             name: "Incline Dumbbell Fly & Press Combo",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Decline Dumbbell Fly & Press Combo",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }, {
           name: "Shoulders",
           exercises: [{
             name: "Front Dumbbell Raise & Press Combo",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Incline Rear Delt Raises",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }]
       },
@@ -2346,19 +2346,19 @@ const SYSTEMS = {
           exercises: [{
             name: "Cable Incline Triceps Extension (rope)",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Decline Barbell Triceps Extension",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }, {
             name: "High-Pulley Cable Curls",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Seated Dumbbell Curls",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }]
       },
@@ -2370,33 +2370,33 @@ const SYSTEMS = {
           exercises: [{
             name: "Rack Deadlifts",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Seated Cable Deadlift",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }, {
           name: "Hamstrings",
           exercises: [{
             name: "Single-Leg Hamstring Curl",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Sissy Squats",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }, {
           name: "Upper Abs",
           exercises: [{
             name: "Ab Crunch Machine",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Decline Situp",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }]
       },
@@ -2408,30 +2408,30 @@ const SYSTEMS = {
           exercises: [{
             name: "Incline Dumbbell Rows",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Bentover Dumbbell Row",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }, {
             name: "Wide-Grip Lat Pulldown",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Rope Lat Pulldown",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }, {
           name: "Calves",
           exercises: [{
             name: "Calf Press (hack squat machine)",
             sets: "5 x 30,25,20,15,10",
-            rest: "30→25→20→15 sec by set"
+            rest: "30â25â20â15 sec by set"
           }, {
             name: "Standing Calf Raises (facing hack squat)",
             sets: "5 x 10,15,20,25,30",
-            rest: "10→15→20→25 sec by set"
+            rest: "10â15â20â25 sec by set"
           }]
         }]
       },
@@ -2457,28 +2457,28 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy warm up",
             sets: "2 min",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Main Set",
           exercises: [{
             name: "Run / Walk intervals",
             sets: "30 sec run / 30 sec walk",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Number of sets",
             input: {
               key: "sets",
               label: "sets"
             },
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Cool Down",
           exercises: [{
             name: "Easy cool down",
             sets: "2 min",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2489,7 +2489,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy warm up",
             sets: "5 min",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Main Set",
@@ -2499,14 +2499,14 @@ const SYSTEMS = {
               key: "distance",
               label: "e.g. 5km"
             },
-            rest: "—"
+            rest: "â"
           }, {
             name: "Run pace",
             input: {
               key: "pace",
               label: "e.g. 5:30/km"
             },
-            rest: "—"
+            rest: "â"
           }, {
             name: "Run interval",
             input: {
@@ -2515,7 +2515,7 @@ const SYSTEMS = {
               type: "select",
               options: ["60", "90"]
             },
-            rest: "—"
+            rest: "â"
           }, {
             name: "Walk interval",
             sets: "30 sec walk",
@@ -2526,7 +2526,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy cool down",
             sets: "5 min",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2537,17 +2537,17 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy warm up",
             sets: "5 min",
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Main Set",
           exercises: [{
-            name: "400m repeats — pace",
+            name: "400m repeats â pace",
             input: {
               key: "pace",
               label: "e.g. 4:30/km"
             },
-            rest: "—"
+            rest: "â"
           }, {
             name: "Number of sets",
             input: {
@@ -2561,7 +2561,7 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy cool down",
             sets: "5 min",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2572,39 +2572,39 @@ const SYSTEMS = {
           exercises: [{
             name: "Easy warm up",
             sets: "2 min",
-            rest: "—"
+            rest: "â"
           }, {
-            name: "Run / walk primer — 30 sec run / 30 sec walk",
+            name: "Run / walk primer â 30 sec run / 30 sec walk",
             sets: "",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Primer sets",
             input: {
               key: "primerSets",
               label: "sets"
             },
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Main Set",
           exercises: [{
-            name: "Hill repeats — 30 sec up, 30 sec rest/walk down",
+            name: "Hill repeats â 30 sec up, 30 sec rest/walk down",
             sets: "",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Hill sets",
             input: {
               key: "hillSets",
               label: "sets"
             },
-            rest: "—"
+            rest: "â"
           }]
         }, {
           name: "Cool Down",
           exercises: [{
             name: "Easy cool down",
             sets: "2 min",
-            rest: "—"
+            rest: "â"
           }]
         }]
       },
@@ -2615,14 +2615,14 @@ const SYSTEMS = {
           exercises: [{
             name: "Run 1.6km (1 mile)",
             sets: "",
-            rest: "—"
+            rest: "â"
           }, {
             name: "Target pace",
             input: {
               key: "pace",
               label: "e.g. 5:00/km"
             },
-            rest: "—"
+            rest: "â"
           }]
         }]
       }
@@ -2670,21 +2670,21 @@ function Tile({
   accent
 }) {
   const accentText = {
-    lime: "text-lime-400",
-    orange: "text-orange-500",
-    cyan: "text-cyan-400"
+    lime: "text-[#B8860B]",
+    orange: "text-[#B00020]",
+    cyan: "text-[#0047AB]"
   }[accent];
   const accentBg = {
-    lime: "bg-lime-400/10",
-    orange: "bg-orange-500/10",
-    cyan: "bg-cyan-400/10"
+    lime: "bg-[#B8860B]/10",
+    orange: "bg-[#B00020]/10",
+    cyan: "bg-[#0047AB]/10"
   }[accent];
   return /*#__PURE__*/_jsxs("div", {
-    className: "bg-zinc-900 rounded-xl p-4 flex flex-col gap-3 border border-zinc-800",
+    className: "bg-[#f6f3ea] rounded-xl p-4 flex flex-col gap-3 border border-[#ddd6c5]",
     children: [/*#__PURE__*/_jsxs("div", {
       className: "flex items-center justify-between",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-[11px] uppercase tracking-wide text-zinc-500 font-medium",
+        className: "text-[11px] uppercase tracking-wide text-[#948d78] font-medium",
         children: label
       }), /*#__PURE__*/_jsx("div", {
         className: `${accentBg} rounded-lg p-1.5`,
@@ -2695,10 +2695,10 @@ function Tile({
     }), /*#__PURE__*/_jsxs("div", {
       className: "flex items-baseline gap-1",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "font-mono text-3xl font-bold text-zinc-50",
+        className: "font-mono text-3xl font-bold text-black",
         children: value
       }), unit && /*#__PURE__*/_jsx("span", {
-        className: "text-sm text-zinc-500",
+        className: "text-sm text-[#948d78]",
         children: unit
       })]
     })]
@@ -2729,20 +2729,20 @@ function ManualEntryForm({
     set: setMuscle
   }];
   return /*#__PURE__*/_jsxs("div", {
-    className: "bg-zinc-900 rounded-xl p-4 border border-orange-500/30 flex flex-col gap-3",
+    className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#B00020]/30 flex flex-col gap-3",
     children: [/*#__PURE__*/_jsx("div", {
       className: "grid grid-cols-3 gap-3",
       children: fields.map(f => /*#__PURE__*/_jsxs("label", {
         className: "flex flex-col gap-1",
         children: [/*#__PURE__*/_jsx("span", {
-          className: "text-[11px] uppercase tracking-wide text-zinc-500",
+          className: "text-[11px] uppercase tracking-wide text-[#948d78]",
           children: f.label
         }), /*#__PURE__*/_jsx("input", {
           type: "number",
           step: "0.1",
           value: f.value,
           onChange: e => f.set(e.target.value),
-          className: "bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1.5 text-sm font-mono text-zinc-50 focus:outline-none focus:border-orange-500"
+          className: "bg-zinc-950 border border-[#ddd6c5] rounded-lg px-2 py-1.5 text-sm font-mono text-zinc-50 focus:outline-none focus:border-[#B00020]"
         })]
       }, f.key))
     }), /*#__PURE__*/_jsxs("div", {
@@ -2753,13 +2753,13 @@ function ManualEntryForm({
           bodyFat,
           muscle
         }),
-        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-orange-500 text-zinc-950 hover:bg-orange-400 transition-colors",
+        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#B00020] text-white hover:bg-[#C41230] transition-colors",
         children: [/*#__PURE__*/_jsx(Check, {
           className: "w-3.5 h-3.5"
         }), " Save"]
       }), /*#__PURE__*/_jsxs("button", {
         onClick: onCancel,
-        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors",
+        className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#ddd6c5] text-[#8a8370] hover:text-black transition-colors",
         children: [/*#__PURE__*/_jsx(X, {
           className: "w-3.5 h-3.5"
         }), " Cancel"]
@@ -2789,29 +2789,29 @@ function OverviewTab({
       children: [/*#__PURE__*/_jsx(Tile, {
         icon: Moon,
         label: "Sleep Score",
-        value: sleepScore ?? "—",
+        value: sleepScore ?? "â",
         accent: "cyan"
       }), /*#__PURE__*/_jsx(Tile, {
         icon: Zap,
         label: "Stress Score",
-        value: stressScore ?? "—",
+        value: stressScore ?? "â",
         accent: "cyan"
       }), /*#__PURE__*/_jsx(Tile, {
         icon: Scale,
         label: "Weight",
-        value: stats.weight || "—",
+        value: stats.weight || "â",
         unit: stats.weight ? "kg" : "",
         accent: "orange"
       }), /*#__PURE__*/_jsx(Tile, {
         icon: Percent,
         label: "Body Fat",
-        value: stats.bodyFat || "—",
+        value: stats.bodyFat || "â",
         unit: stats.bodyFat ? "%" : "",
         accent: "orange"
       }), /*#__PURE__*/_jsx(Tile, {
         icon: Activity,
         label: "Skeletal Muscle",
-        value: stats.muscle || "—",
+        value: stats.muscle || "â",
         unit: stats.muscle ? "kg" : "",
         accent: "orange"
       })]
@@ -2824,65 +2824,65 @@ function OverviewTab({
       onCancel: () => setShowForm(false)
     }) : /*#__PURE__*/_jsxs("button", {
       onClick: () => setShowForm(true),
-      className: "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500/20 transition-colors",
+      className: "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-[#B00020]/10 text-[#B00020] border border-[#B00020]/30 hover:bg-[#B00020]/20 transition-colors",
       children: [/*#__PURE__*/_jsx(Plus, {
         className: "w-4 h-4"
       }), " Log weight & body composition"]
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5]",
       children: [/*#__PURE__*/_jsxs("div", {
         className: "flex items-center justify-between mb-4 flex-wrap gap-y-2",
         children: [/*#__PURE__*/_jsx("h3", {
-          className: "text-sm font-semibold text-zinc-200",
+          className: "text-sm font-semibold text-black",
           children: monthLabel
         }), /*#__PURE__*/_jsxs("div", {
-          className: "flex items-center gap-3 text-[10px] text-zinc-500 flex-wrap",
+          className: "flex items-center gap-3 text-[10px] text-[#948d78] flex-wrap",
           children: [/*#__PURE__*/_jsxs("span", {
             className: "flex items-center gap-1",
             children: [/*#__PURE__*/_jsx("span", {
-              className: "w-2 h-2 rounded-full bg-lime-400 inline-block"
+              className: "w-2 h-2 rounded-full bg-[#B8860B] inline-block"
             }), " Workout"]
           }), /*#__PURE__*/_jsxs("span", {
             className: "flex items-center gap-1",
             children: [/*#__PURE__*/_jsx("span", {
-              className: "w-2 h-2 rounded-full bg-orange-500 inline-block"
+              className: "w-2 h-2 rounded-full bg-[#B00020] inline-block"
             }), " Nutrition"]
           }), /*#__PURE__*/_jsxs("span", {
             className: "flex items-center gap-1",
             children: [/*#__PURE__*/_jsx("span", {
-              className: "w-2 h-2 rounded-full bg-cyan-400 inline-block"
+              className: "w-2 h-2 rounded-full bg-[#0047AB] inline-block"
             }), " Sleep"]
           }), /*#__PURE__*/_jsxs("span", {
             className: "flex items-center gap-1",
             children: [/*#__PURE__*/_jsx("span", {
-              className: "w-2 h-2 rounded-full bg-violet-400 inline-block"
+              className: "w-2 h-2 rounded-full bg-[#006400] inline-block"
             }), " Body Comp"]
           })]
         })]
       }), /*#__PURE__*/_jsx("div", {
         className: "grid grid-cols-7 gap-1.5 mb-2",
         children: weekdayLabels.map((w, i) => /*#__PURE__*/_jsx("div", {
-          className: "text-center text-[10px] text-zinc-600 font-medium",
+          className: "text-center text-[10px] text-[#a6a08c] font-medium",
           children: w
         }, i))
       }), /*#__PURE__*/_jsx("div", {
         className: "grid grid-cols-7 gap-1.5",
         children: cells.map((cell, i) => cell === null ? /*#__PURE__*/_jsx("div", {}, i) : /*#__PURE__*/_jsxs("button", {
           onClick: () => setSelectedDay(selectedDay === cell.day ? null : cell.day),
-          className: `aspect-square rounded-lg flex flex-col items-center justify-center gap-1 border transition-colors ${selectedDay === cell.day ? "border-cyan-400 bg-zinc-800" : cell.isToday ? "border-zinc-500 bg-zinc-800" : "border-zinc-800/60 bg-zinc-950 hover:border-zinc-700"}`,
+          className: `aspect-square rounded-lg flex flex-col items-center justify-center gap-1 border transition-colors ${selectedDay === cell.day ? "border-[#0047AB] bg-[#ddd6c5]" : cell.isToday ? "border-[#a6a08c] bg-[#ddd6c5]" : "border-[#ddd6c5]/60 bg-[#f6f3ea] hover:border-[#c9c2ac]"}`,
           children: [/*#__PURE__*/_jsx("span", {
-            className: `text-xs ${cell.isToday || selectedDay === cell.day ? "text-zinc-50 font-bold" : "text-zinc-400"}`,
+            className: `text-xs ${cell.isToday || selectedDay === cell.day ? "text-black font-bold" : "text-[#8a8370]"}`,
             children: cell.day
           }), /*#__PURE__*/_jsxs("span", {
             className: "grid grid-cols-2 gap-0.5 w-3",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `w-1.5 h-1.5 rounded-full ${cell.workoutLogged ? "bg-lime-400" : "bg-zinc-800"}`
+              className: `w-1.5 h-1.5 rounded-full ${cell.workoutLogged ? "bg-[#B8860B]" : "bg-[#ddd6c5]"}`
             }), /*#__PURE__*/_jsx("span", {
-              className: `w-1.5 h-1.5 rounded-full ${cell.nutritionLogged ? "bg-orange-500" : "bg-zinc-800"}`
+              className: `w-1.5 h-1.5 rounded-full ${cell.nutritionLogged ? "bg-[#B00020]" : "bg-[#ddd6c5]"}`
             }), /*#__PURE__*/_jsx("span", {
-              className: `w-1.5 h-1.5 rounded-full ${cell.sleepLogged ? "bg-cyan-400" : "bg-zinc-800"}`
+              className: `w-1.5 h-1.5 rounded-full ${cell.sleepLogged ? "bg-[#0047AB]" : "bg-[#ddd6c5]"}`
             }), /*#__PURE__*/_jsx("span", {
-              className: `w-1.5 h-1.5 rounded-full ${cell.bodyStatsLogged ? "bg-violet-400" : "bg-zinc-800"}`
+              className: `w-1.5 h-1.5 rounded-full ${cell.bodyStatsLogged ? "bg-[#006400]" : "bg-[#ddd6c5]"}`
             })]
           })]
         }, i))
@@ -2891,29 +2891,29 @@ function OverviewTab({
         if (!cell) return null;
         const entry = cell.entry;
         return /*#__PURE__*/_jsxs("div", {
-          className: "mt-4 pt-4 border-t border-zinc-800 flex flex-col gap-3",
+          className: "mt-4 pt-4 border-t border-[#ddd6c5] flex flex-col gap-3",
           children: [/*#__PURE__*/_jsxs("span", {
-            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            className: "text-[11px] uppercase tracking-wide text-[#948d78]",
             children: [monthLabel.split(" ")[0], " ", cell.day]
           }), /*#__PURE__*/_jsxs("div", {
             className: "flex items-start gap-2.5",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${cell.workoutLogged ? "bg-lime-400" : "bg-zinc-800"}`
+              className: `w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${cell.workoutLogged ? "bg-[#B8860B]" : "bg-[#ddd6c5]"}`
             }), cell.workoutLogged ? /*#__PURE__*/_jsx("div", {
-              className: "text-sm text-zinc-300 flex flex-col gap-1 flex-1",
+              className: "text-sm text-black flex flex-col gap-1 flex-1",
               children: entry.workouts.map((w, i) => /*#__PURE__*/_jsxs("div", {
                 className: "flex items-center justify-between gap-2",
                 children: [/*#__PURE__*/_jsxs("div", {
                   children: [/*#__PURE__*/_jsx("span", {
-                    className: "font-medium text-zinc-200",
+                    className: "font-medium text-black",
                     children: w.title
                   }), /*#__PURE__*/_jsxs("span", {
-                    className: "text-zinc-500",
+                    className: "text-[#948d78]",
                     children: [" \u2014 System ", w.system, ", ", w.day]
                   })]
                 }), /*#__PURE__*/_jsx("button", {
                   onClick: () => onDeleteWorkout(cell.dateKey, i),
-                  className: "text-zinc-600 hover:text-red-400 flex-shrink-0 transition-colors",
+                  className: "text-[#a6a08c] hover:text-[#dc2626] flex-shrink-0 transition-colors",
                   title: "Delete this logged workout",
                   children: /*#__PURE__*/_jsx(X, {
                     className: "w-3.5 h-3.5"
@@ -2921,54 +2921,54 @@ function OverviewTab({
                 })]
               }, i))
             }) : /*#__PURE__*/_jsx("span", {
-              className: "text-sm text-zinc-500",
+              className: "text-sm text-[#948d78]",
               children: "No workout logged"
             })]
           }), /*#__PURE__*/_jsxs("div", {
             className: "flex items-start gap-2.5",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${cell.nutritionLogged ? "bg-orange-500" : "bg-zinc-800"}`
+              className: `w-2 h-2 rounded-full flex-shrink-0 mt-1.5 ${cell.nutritionLogged ? "bg-[#B00020]" : "bg-[#ddd6c5]"}`
             }), cell.nutritionLogged ? /*#__PURE__*/_jsxs("div", {
-              className: "text-sm text-zinc-300 flex flex-col gap-1",
+              className: "text-sm text-black flex flex-col gap-1",
               children: [/*#__PURE__*/_jsxs("span", {
-                className: "font-mono text-zinc-200",
+                className: "font-mono text-black",
                 children: [entry.nutrition.calories, " kcal remaining \xB7 ", entry.nutrition.carbs, "g carbs \xB7 ", entry.nutrition.fat, "g fat \xB7 ", entry.nutrition.protein, "g protein"]
               }), entry.nutrition.meals?.length > 0 ? /*#__PURE__*/_jsx("div", {
                 className: "flex flex-col gap-1.5 mt-1",
                 children: entry.nutrition.meals.map((m, i) => {
                   const g = mealMacroGrams(m);
                   return /*#__PURE__*/_jsxs("div", {
-                    className: "text-[12px] text-zinc-500",
+                    className: "text-[12px] text-[#948d78]",
                     children: [/*#__PURE__*/_jsxs("div", {
                       children: [m.name, ": ", m.items.map(it => it.name).join(", "), " (", m.kcal, " kcal)"]
                     }), m.kcal > 0 && /*#__PURE__*/_jsxs("div", {
-                      className: "text-zinc-600",
+                      className: "text-[#a6a08c]",
                       children: ["Carbs ", g.carbs, "g \xB7 Fat ", g.fat, "g \xB7 Protein ", g.protein, "g"]
                     })]
                   }, i);
                 })
               }) : null]
             }) : /*#__PURE__*/_jsx("span", {
-              className: "text-sm text-zinc-500",
+              className: "text-sm text-[#948d78]",
               children: "No nutrition logged"
             })]
           }), /*#__PURE__*/_jsxs("div", {
             className: "flex items-center gap-2.5",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.sleepLogged ? "bg-cyan-400" : "bg-zinc-800"}`
+              className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.sleepLogged ? "bg-[#0047AB]" : "bg-[#ddd6c5]"}`
             }), /*#__PURE__*/_jsx("span", {
-              className: "text-sm text-zinc-300",
+              className: "text-sm text-black",
               children: cell.sleepLogged ? `Sleep Score: ${entry.sleepScore}/100` : "No sleep data logged"
             })]
           }), /*#__PURE__*/_jsxs("div", {
             className: "flex items-center gap-2.5",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.bodyStatsLogged ? "bg-violet-400" : "bg-zinc-800"}`
+              className: `w-2 h-2 rounded-full flex-shrink-0 ${cell.bodyStatsLogged ? "bg-[#006400]" : "bg-[#ddd6c5]"}`
             }), cell.bodyStatsLogged ? /*#__PURE__*/_jsxs("span", {
-              className: "text-sm text-zinc-300 font-mono",
+              className: "text-sm text-black font-mono",
               children: [entry.bodyStats.weight, "kg \xB7 ", entry.bodyStats.bodyFat, "% BF \xB7 ", entry.bodyStats.muscle, "kg SMM"]
             }) : /*#__PURE__*/_jsx("span", {
-              className: "text-sm text-zinc-500",
+              className: "text-sm text-[#948d78]",
               children: "No weight/body comp logged"
             })]
           })]
@@ -2988,16 +2988,16 @@ function ExerciseRow({
     children: [/*#__PURE__*/_jsxs("div", {
       className: "flex flex-col flex-1 min-w-0",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-sm text-zinc-200",
+        className: "text-sm text-black",
         children: ex.name
-      }), ex.rest && ex.rest !== "—" && /*#__PURE__*/_jsxs("span", {
-        className: "text-[11px] text-zinc-500",
+      }), ex.rest && ex.rest !== "â" && /*#__PURE__*/_jsxs("span", {
+        className: "text-[11px] text-[#948d78]",
         children: ["Rest ", ex.rest]
       })]
     }), ex.input ? ex.input.type === "select" ? /*#__PURE__*/_jsxs("select", {
       value: value || "",
       onChange: e => onChange(ex.input.key, e.target.value),
-      className: "bg-zinc-950 border border-lime-400/30 rounded-lg px-2 py-1 text-sm font-mono text-lime-400 focus:outline-none focus:border-lime-400 flex-shrink-0",
+      className: "bg-zinc-950 border border-[#B8860B]/30 rounded-lg px-2 py-1 text-sm font-mono text-[#B8860B] focus:outline-none focus:border-[#B8860B] flex-shrink-0",
       children: [/*#__PURE__*/_jsx("option", {
         value: "",
         disabled: true,
@@ -3011,9 +3011,9 @@ function ExerciseRow({
       value: value || "",
       onChange: e => onChange(ex.input.key, e.target.value),
       placeholder: ex.input.label,
-      className: "bg-zinc-950 border border-lime-400/30 rounded-lg px-2 py-1 text-sm font-mono text-lime-400 placeholder-zinc-600 focus:outline-none focus:border-lime-400 flex-shrink-0 w-28 text-right"
+      className: "bg-zinc-950 border border-[#B8860B]/30 rounded-lg px-2 py-1 text-sm font-mono text-[#B8860B] placeholder-[#a6a08c] focus:outline-none focus:border-[#B8860B] flex-shrink-0 w-28 text-right"
     }) : ex.sets && /*#__PURE__*/_jsx("span", {
-      className: "font-mono text-sm text-lime-400 flex-shrink-0 text-right",
+      className: "font-mono text-sm text-[#B8860B] flex-shrink-0 text-right",
       children: ex.sets
     })]
   });
@@ -3025,12 +3025,12 @@ function WorkoutBody({
 }) {
   if (workout.note) {
     return /*#__PURE__*/_jsx("p", {
-      className: "text-sm text-zinc-500",
+      className: "text-sm text-[#948d78]",
       children: workout.note
     });
   }
   const cardioLine = workout.cardio ? /*#__PURE__*/_jsxs("div", {
-    className: "text-[11px] text-cyan-400 mb-3",
+    className: "text-[11px] text-[#0047AB] mb-3",
     children: ["Cardio: ", workout.cardio]
   }) : null;
   if (workout.sections) {
@@ -3039,10 +3039,10 @@ function WorkoutBody({
         className: "flex flex-col gap-4",
         children: workout.sections.map((sec, i) => /*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("span", {
-            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            className: "text-[11px] uppercase tracking-wide text-[#948d78]",
             children: sec.name
           }), /*#__PURE__*/_jsx("div", {
-            className: "flex flex-col divide-y divide-zinc-800/70 mt-1",
+            className: "flex flex-col divide-y divide-[#ddd6c5]/70 mt-1",
             children: sec.exercises.map((ex, j) => /*#__PURE__*/_jsx(ExerciseRow, {
               ex: ex,
               value: ex.input ? params?.[ex.input.key] : undefined,
@@ -3055,7 +3055,7 @@ function WorkoutBody({
   }
   return /*#__PURE__*/_jsxs("div", {
     children: [cardioLine, /*#__PURE__*/_jsx("div", {
-      className: "flex flex-col divide-y divide-zinc-800/70",
+      className: "flex flex-col divide-y divide-[#ddd6c5]/70",
       children: workout.exercises.map((ex, i) => /*#__PURE__*/_jsx(ExerciseRow, {
         ex: ex
       }, i))
@@ -3097,18 +3097,18 @@ function WorkoutTab({
             setExpandedDay(null);
             setPickerDay(null);
           },
-          className: `rounded-xl p-3 text-left border transition-colors ${system === id ? "bg-lime-400/10 border-lime-400 text-lime-400" : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700"}`,
+          className: `rounded-xl p-3 text-left border transition-colors ${system === id ? "bg-[#B8860B]/10 border-[#B8860B] text-[#B8860B]" : "bg-[#f6f3ea] border-[#ddd6c5] text-[#8a8370] hover:border-[#c9c2ac]"}`,
           children: [/*#__PURE__*/_jsx("div", {
             className: "text-sm font-semibold",
             children: s ? s.name : `System ${id}`
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-600 mt-0.5",
+            className: "text-[11px] text-[#a6a08c] mt-0.5",
             children: s ? "" : "Upload this system's data next"
           })]
         }, id);
       })
     }), !sys ? /*#__PURE__*/_jsx("div", {
-      className: "bg-zinc-900 rounded-xl p-5 border border-zinc-800 text-sm text-zinc-500",
+      className: "bg-[#f6f3ea] rounded-xl p-5 border border-[#ddd6c5] text-sm text-[#948d78]",
       children: "No data yet for this system \u2014 upload it and I'll wire it in the same way as Systems A and B."
     }) : /*#__PURE__*/_jsx("div", {
       className: "flex flex-col gap-2",
@@ -3120,17 +3120,17 @@ function WorkoutTab({
         const isRestLike = !workout.exercises && !workout.sections;
         const isPicking = pickerDay === day;
         return /*#__PURE__*/_jsxs("div", {
-          className: `bg-zinc-900 rounded-xl border overflow-hidden ${isToday ? "border-lime-400/50" : "border-zinc-800"}`,
+          className: `bg-[#f6f3ea] rounded-xl border overflow-hidden ${isToday ? "border-[#B8860B]/50" : "border-[#ddd6c5]"}`,
           children: [/*#__PURE__*/_jsxs("button", {
             onClick: () => setExpandedDay(isExpanded ? null : day),
             className: "w-full flex items-center justify-between px-4 py-3 text-left gap-3",
             children: [/*#__PURE__*/_jsxs("div", {
               className: "flex items-center gap-3 min-w-0",
               children: [/*#__PURE__*/_jsx("span", {
-                className: `text-[11px] uppercase tracking-wide flex-shrink-0 ${isToday ? "text-lime-400 font-bold" : "text-zinc-500"}`,
+                className: `text-[11px] uppercase tracking-wide flex-shrink-0 ${isToday ? "text-[#B8860B] font-bold" : "text-[#948d78]"}`,
                 children: sys.type === "numbered" ? `Day ${day}` : day
               }), /*#__PURE__*/_jsx("span", {
-                className: "text-sm font-semibold text-zinc-200 truncate",
+                className: "text-sm font-semibold text-black truncate",
                 children: workout.title
               })]
             }), !isRestLike && /*#__PURE__*/_jsx("button", {
@@ -3138,33 +3138,33 @@ function WorkoutTab({
                 e.stopPropagation();
                 openPicker(day);
               },
-              className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors bg-lime-400 text-zinc-950 hover:bg-lime-300",
+              className: "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0 transition-colors bg-[#B8860B] text-white hover:bg-[#C9971A]",
               children: "Log"
             })]
           }), isPicking && /*#__PURE__*/_jsxs("div", {
             className: "px-4 pb-3 flex items-center gap-2",
             onClick: e => e.stopPropagation(),
             children: [/*#__PURE__*/_jsx("span", {
-              className: "text-[11px] text-zinc-500 flex-shrink-0",
+              className: "text-[11px] text-[#948d78] flex-shrink-0",
               children: "Log for:"
             }), /*#__PURE__*/_jsx("input", {
               type: "date",
               value: pickerDate,
               onChange: e => setPickerDate(e.target.value),
-              className: "bg-zinc-950 border border-zinc-800 rounded-lg px-2 py-1 text-xs font-mono text-zinc-50 focus:outline-none focus:border-lime-400"
+              className: "bg-zinc-950 border border-[#ddd6c5] rounded-lg px-2 py-1 text-xs font-mono text-zinc-50 focus:outline-none focus:border-[#B8860B]"
             }), /*#__PURE__*/_jsx("button", {
               onClick: () => setPickerDate(todayISO),
-              className: "text-[11px] text-zinc-500 hover:text-zinc-300 underline flex-shrink-0",
+              className: "text-[11px] text-[#948d78] hover:text-black underline flex-shrink-0",
               children: "Today"
             }), /*#__PURE__*/_jsxs("button", {
               onClick: () => confirmLog(day),
-              className: "ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-lime-400 text-zinc-950 hover:bg-lime-300 flex-shrink-0",
+              className: "ml-auto flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-[#B8860B] text-white hover:bg-[#C9971A] flex-shrink-0",
               children: [/*#__PURE__*/_jsx(Check, {
                 className: "w-3 h-3"
               }), " Confirm"]
             }), /*#__PURE__*/_jsx("button", {
               onClick: () => setPickerDay(null),
-              className: "px-2 py-1 rounded-lg text-xs text-zinc-500 hover:text-zinc-300 flex-shrink-0",
+              className: "px-2 py-1 rounded-lg text-xs text-[#948d78] hover:text-black flex-shrink-0",
               children: "Cancel"
             })]
           }), isExpanded && /*#__PURE__*/_jsx("div", {
@@ -3181,7 +3181,7 @@ function WorkoutTab({
   });
 }
 
-// Shows a meal's macro breakdown in grams — read directly from synced data (carbsG/fatG/
+// Shows a meal's macro breakdown in grams â read directly from synced data (carbsG/fatG/
 // proteinG), not estimated. Blank if that meal's sync didn't capture grams.
 function macroGramsLabel(item) {
   if (item.carbsG == null || item.fatG == null || item.proteinG == null) return "";
@@ -3189,7 +3189,7 @@ function macroGramsLabel(item) {
 }
 
 // Pulls a meal's macro grams straight from synced data. Returns null for a macro (not 0)
-// when it wasn't captured at sync time — "unknown" and "genuinely zero" are different
+// when it wasn't captured at sync time â "unknown" and "genuinely zero" are different
 // things and shouldn't look the same on a chart.
 function mealMacroGrams(meal) {
   if (meal.carbsG == null || meal.fatG == null || meal.proteinG == null) {
@@ -3212,38 +3212,38 @@ function NutritionTab({
   onSync
 }) {
   const remaining = {
-    carbs: healthData?.["Carbs Remaining"] ?? "—",
-    fat: healthData?.["Fat Remaining"] ?? "—",
-    protein: healthData?.["Protein Remaining"] ?? "—",
-    calories: healthData?.["Calories Remaining"] ?? "—"
+    carbs: healthData?.["Carbs Remaining"] ?? "â",
+    fat: healthData?.["Fat Remaining"] ?? "â",
+    protein: healthData?.["Protein Remaining"] ?? "â",
+    calories: healthData?.["Calories Remaining"] ?? "â"
   };
   const lastSynced = healthData ? `${healthData.Date || ""} ${healthData.Time || ""}`.trim() : null;
 
-  // Meal data now lives on healthData (set from the live Chrome pull), not hardcoded here —
+  // Meal data now lives on healthData (set from the live Chrome pull), not hardcoded here â
   // this is what lets the Overview calendar show the same meal detail for a given date.
   const meals = healthData?.meals || [];
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-4",
     children: [/*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden",
+      className: "bg-[#f6f3ea] rounded-xl border border-[#ddd6c5] overflow-hidden",
       children: [/*#__PURE__*/_jsxs("div", {
         className: "flex items-center justify-between px-4 pt-3",
         children: [/*#__PURE__*/_jsx("span", {
-          className: "text-sm font-semibold text-zinc-200",
+          className: "text-sm font-semibold text-black",
           children: "Nutrients Remaining"
         }), /*#__PURE__*/_jsxs("button", {
           onClick: onSync,
           disabled: syncing,
-          className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-orange-500/10 text-orange-500 border border-orange-500/30 hover:bg-orange-500/20 transition-colors disabled:opacity-60",
+          className: "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#B00020]/10 text-[#B00020] border border-[#B00020]/30 hover:bg-[#B00020]/20 transition-colors disabled:opacity-60",
           children: [/*#__PURE__*/_jsx(RefreshCw, {
             className: `w-3 h-3 ${syncing ? "animate-spin" : ""}`
-          }), syncing ? "Syncing…" : "Sync"]
+          }), syncing ? "Syncingâ¦" : "Sync"]
         })]
       }), lastSynced && !syncError && /*#__PURE__*/_jsxs("div", {
-        className: "px-4 text-[11px] text-zinc-600 mt-1",
+        className: "px-4 text-[11px] text-[#a6a08c] mt-1",
         children: ["Last synced: ", lastSynced]
       }), syncError && /*#__PURE__*/_jsxs("div", {
-        className: "flex items-start gap-1.5 px-4 mt-1 text-[11px] text-red-400",
+        className: "flex items-start gap-1.5 px-4 mt-1 text-[11px] text-[#dc2626]",
         children: [/*#__PURE__*/_jsx(AlertCircle, {
           className: "w-3.5 h-3.5 flex-shrink-0 mt-0.5"
         }), " ", syncError]
@@ -3251,34 +3251,34 @@ function NutritionTab({
         className: "grid grid-cols-4 px-4 py-4 text-center",
         children: [/*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "font-mono text-xl font-bold text-zinc-50",
+            className: "font-mono text-xl font-bold text-black",
             children: remaining.carbs
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Carbs (g)"
           })]
         }), /*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "font-mono text-xl font-bold text-zinc-50",
+            className: "font-mono text-xl font-bold text-black",
             children: remaining.fat
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Fat (g)"
           })]
         }), /*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "font-mono text-xl font-bold text-zinc-50",
+            className: "font-mono text-xl font-bold text-black",
             children: remaining.protein
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Protein (g)"
           })]
         }), /*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "font-mono text-xl font-bold text-orange-500",
+            className: "font-mono text-xl font-bold text-[#B00020]",
             children: remaining.calories
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Calories"
           })]
         })]
@@ -3286,37 +3286,37 @@ function NutritionTab({
     }), /*#__PURE__*/_jsx("div", {
       className: "flex flex-col gap-3",
       children: meals.map(m => /*#__PURE__*/_jsxs("div", {
-        className: "bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden",
+        className: "bg-[#f6f3ea] rounded-xl border border-[#ddd6c5] overflow-hidden",
         children: [/*#__PURE__*/_jsxs("div", {
-          className: "px-4 pt-3 pb-2 border-b border-zinc-800/70",
+          className: "px-4 pt-3 pb-2 border-b border-[#ddd6c5]/70",
           children: [/*#__PURE__*/_jsxs("div", {
             className: "flex items-center justify-between",
             children: [/*#__PURE__*/_jsx("span", {
-              className: "text-sm font-semibold text-zinc-200",
+              className: "text-sm font-semibold text-black",
               children: m.name
             }), /*#__PURE__*/_jsx("span", {
-              className: "font-mono text-sm text-zinc-300",
+              className: "font-mono text-sm text-black",
               children: m.kcal
             })]
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500 mt-0.5",
+            className: "text-[11px] text-[#948d78] mt-0.5",
             children: macroGramsLabel(m)
           })]
         }), /*#__PURE__*/_jsx("div", {
-          className: "flex flex-col divide-y divide-zinc-800/70",
+          className: "flex flex-col divide-y divide-[#ddd6c5]/70",
           children: m.items.map((it, i) => /*#__PURE__*/_jsxs("div", {
             className: "flex items-center justify-between px-4 py-2.5",
             children: [/*#__PURE__*/_jsxs("div", {
               className: "flex flex-col",
               children: [/*#__PURE__*/_jsx("span", {
-                className: "text-sm text-zinc-200",
+                className: "text-sm text-black",
                 children: it.name
               }), /*#__PURE__*/_jsx("span", {
-                className: "text-[11px] text-zinc-500",
+                className: "text-[11px] text-[#948d78]",
                 children: it.subtitle
               })]
             }), /*#__PURE__*/_jsx("span", {
-              className: "font-mono text-sm text-zinc-400",
+              className: "font-mono text-sm text-[#8a8370]",
               children: it.kcal
             })]
           }, i))
@@ -3326,15 +3326,15 @@ function NutritionTab({
   });
 }
 const SLEEP_STAGE_COLORS = {
-  deep: "bg-blue-600",
-  light: "bg-sky-400",
-  rem: "bg-fuchsia-500",
-  awake: "bg-zinc-600"
+  deep: "bg-[#16345C]",
+  light: "bg-[#2F80C4]",
+  rem: "bg-[#9333EA]",
+  awake: "bg-[#8a8370]"
 };
 
 // Stage proportions computed from actual Garmin data (Jul 20: Deep 55m, Light 4h33m, REM 1h12m, Awake 16m).
 // Exact minute-by-minute order isn't available from the page, so segment order is a reasonable
-// approximation — but the proportions themselves are real, not sample.
+// approximation â but the proportions themselves are real, not sample.
 const SLEEP_TIMELINE = [{
   type: "deep",
   pct: 13
@@ -3365,50 +3365,50 @@ function SleepTab({
   sleepScore,
   logsByDate
 }) {
-  const quality = healthData?.["Sleep Quality"] ?? "—";
-  const duration = healthData?.["Sleep Duration"] ?? "—";
-  const bedtime = healthData?.["Bedtime"] ?? "—";
-  const wakeTime = healthData?.["Wake Time"] ?? "—";
+  const quality = healthData?.["Sleep Quality"] ?? "â";
+  const duration = healthData?.["Sleep Duration"] ?? "â";
+  const bedtime = healthData?.["Bedtime"] ?? "â";
+  const wakeTime = healthData?.["Wake Time"] ?? "â";
   const noteHeading = healthData?.["Sleep Note Heading"] ?? "Not synced yet";
   const noteText = healthData?.["Sleep Note"] ?? "Sync to see last night's summary.";
   const lastSynced = healthData ? `${healthData.Date || ""} ${healthData.Time || ""}`.trim() : null;
   const metrics = [{
     icon: Activity,
     label: "Restless Moments",
-    value: healthData?.["Restless Moments"] ?? "—"
+    value: healthData?.["Restless Moments"] ?? "â"
   }, {
     icon: Heart,
     label: "Resting Heart Rate",
-    value: healthData?.["Resting HR"] ?? "—",
+    value: healthData?.["Resting HR"] ?? "â",
     unit: healthData?.["Resting HR"] ? "bpm" : ""
   }, {
     icon: BatteryCharging,
     label: "Body Battery Change",
-    value: healthData?.["Body Battery Change"] ?? "—"
+    value: healthData?.["Body Battery Change"] ?? "â"
   }, {
     icon: Percent,
     label: "Avg SpO2",
-    value: healthData?.["Avg SpO2"] ?? "—",
+    value: healthData?.["Avg SpO2"] ?? "â",
     unit: healthData?.["Avg SpO2"] ? "%" : ""
   }, {
     icon: Percent,
     label: "Lowest SpO2",
-    value: healthData?.["Lowest SpO2"] ?? "—",
+    value: healthData?.["Lowest SpO2"] ?? "â",
     unit: healthData?.["Lowest SpO2"] ? "%" : ""
   }, {
     icon: Wind,
     label: "Avg Respiration",
-    value: healthData?.["Avg Respiration"] ?? "—",
+    value: healthData?.["Avg Respiration"] ?? "â",
     unit: healthData?.["Avg Respiration"] ? "brpm" : ""
   }, {
     icon: Wind,
     label: "Lowest Respiration",
-    value: healthData?.["Lowest Respiration"] ?? "—",
+    value: healthData?.["Lowest Respiration"] ?? "â",
     unit: healthData?.["Lowest Respiration"] ? "brpm" : ""
   }, {
     icon: Activity,
     label: "Avg Overnight HRV",
-    value: healthData?.["Avg Overnight HRV"] ?? "—",
+    value: healthData?.["Avg Overnight HRV"] ?? "â",
     unit: healthData?.["Avg Overnight HRV"] ? "ms" : ""
   }];
 
@@ -3440,55 +3440,55 @@ function SleepTab({
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-6",
     children: [/*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-5 border border-zinc-800",
+      className: "bg-[#f6f3ea] rounded-xl p-5 border border-[#ddd6c5]",
       children: [/*#__PURE__*/_jsx("div", {
         className: "flex items-baseline justify-between mb-4",
         children: /*#__PURE__*/_jsxs("div", {
           className: "flex items-baseline gap-1.5",
           children: [/*#__PURE__*/_jsx("span", {
-            className: "font-mono text-4xl font-bold text-cyan-400",
+            className: "font-mono text-4xl font-bold text-[#0047AB]",
             children: sleepScore
           }), /*#__PURE__*/_jsx("span", {
-            className: "text-sm text-zinc-500",
+            className: "text-sm text-[#948d78]",
             children: "/ 100"
           })]
         })
       }), lastSynced && /*#__PURE__*/_jsxs("div", {
-        className: "text-[11px] text-zinc-600 mb-3",
+        className: "text-[11px] text-[#a6a08c] mb-3",
         children: ["Last synced: ", lastSynced, " \xB7 sync from the Nutrition tab"]
       }), /*#__PURE__*/_jsxs("div", {
         className: "flex items-center gap-6 mb-4",
         children: [/*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "text-sm font-semibold text-zinc-200",
+            className: "text-sm font-semibold text-black",
             children: quality
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Quality"
           })]
         }), /*#__PURE__*/_jsxs("div", {
           children: [/*#__PURE__*/_jsx("div", {
-            className: "text-sm font-semibold text-zinc-200",
+            className: "text-sm font-semibold text-black",
             children: duration
           }), /*#__PURE__*/_jsx("div", {
-            className: "text-[11px] text-zinc-500",
+            className: "text-[11px] text-[#948d78]",
             children: "Duration"
           })]
         })]
       }), /*#__PURE__*/_jsxs("div", {
-        className: "border-t border-zinc-800 pt-4",
+        className: "border-t border-[#ddd6c5] pt-4",
         children: [/*#__PURE__*/_jsx("span", {
-          className: "text-sm font-semibold text-zinc-200",
+          className: "text-sm font-semibold text-black",
           children: noteHeading
         }), /*#__PURE__*/_jsx("p", {
-          className: "text-[13px] text-zinc-500 mt-1",
+          className: "text-[13px] text-[#948d78] mt-1",
           children: noteText
         })]
       })]
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5]",
       children: [/*#__PURE__*/_jsx("div", {
-        className: "flex items-center gap-4 text-[11px] text-zinc-500 mb-3",
+        className: "flex items-center gap-4 text-[11px] text-[#948d78] mb-3",
         children: ["deep", "light", "rem", "awake"].map(k => /*#__PURE__*/_jsxs("span", {
           className: "flex items-center gap-1.5 capitalize",
           children: [/*#__PURE__*/_jsx("span", {
@@ -3504,66 +3504,66 @@ function SleepTab({
           }
         }, i))
       }), /*#__PURE__*/_jsxs("div", {
-        className: "flex items-center justify-between text-[11px] text-zinc-500 mt-2",
+        className: "flex items-center justify-between text-[11px] text-[#948d78] mt-2",
         children: [/*#__PURE__*/_jsx("span", {
           children: bedtime
         }), /*#__PURE__*/_jsx("span", {
           children: wakeTime
         })]
       }), /*#__PURE__*/_jsx("p", {
-        className: "text-[11px] text-zinc-600 mt-2",
+        className: "text-[11px] text-[#a6a08c] mt-2",
         children: "Stage proportions are real; exact minute-by-minute order is an approximation since Garmin's raw timeline isn't in the synced data."
       })]
     }), /*#__PURE__*/_jsx("div", {
       className: "grid grid-cols-2 gap-3",
       children: metrics.map(m => /*#__PURE__*/_jsxs("div", {
-        className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800",
+        className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5]",
         children: [/*#__PURE__*/_jsxs("div", {
           className: "flex items-center justify-between mb-2",
           children: [/*#__PURE__*/_jsx("span", {
-            className: "text-[11px] uppercase tracking-wide text-zinc-500",
+            className: "text-[11px] uppercase tracking-wide text-[#948d78]",
             children: m.label
           }), /*#__PURE__*/_jsx(m.icon, {
-            className: "w-3.5 h-3.5 text-cyan-400"
+            className: "w-3.5 h-3.5 text-[#0047AB]"
           })]
         }), /*#__PURE__*/_jsxs("div", {
           className: "flex items-baseline gap-1",
           children: [/*#__PURE__*/_jsx("span", {
-            className: "font-mono text-xl font-bold text-zinc-50",
+            className: "font-mono text-xl font-bold text-black",
             children: m.value
           }), m.unit && /*#__PURE__*/_jsx("span", {
-            className: "text-xs text-zinc-500",
+            className: "text-xs text-[#948d78]",
             children: m.unit
           })]
         })]
       }, m.label))
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-1",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5] flex flex-col gap-1",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-sm font-semibold text-zinc-200 mb-2",
+        className: "text-sm font-semibold text-black mb-2",
         children: "This Week"
       }), /*#__PURE__*/_jsx("div", {
-        className: "flex flex-col divide-y divide-zinc-800",
+        className: "flex flex-col divide-y divide-[#ddd6c5]",
         children: weekSleepDays.map(day => /*#__PURE__*/_jsx("div", {
           className: "py-3 first:pt-0 last:pb-0",
           children: day.detail ? /*#__PURE__*/_jsxs("div", {
             children: [/*#__PURE__*/_jsxs("div", {
               className: "flex items-center justify-between mb-1",
               children: [/*#__PURE__*/_jsx("span", {
-                className: `text-xs font-medium ${day.isToday ? "text-zinc-200" : "text-zinc-400"}`,
+                className: `text-xs font-medium ${day.isToday ? "text-black" : "text-[#8a8370]"}`,
                 children: day.label
               }), /*#__PURE__*/_jsxs("span", {
-                className: "font-mono text-sm font-bold text-cyan-400",
-                children: [day.score ?? "—", /*#__PURE__*/_jsx("span", {
-                  className: "text-zinc-600 text-[10px] font-normal",
+                className: "font-mono text-sm font-bold text-[#0047AB]",
+                children: [day.score ?? "â", /*#__PURE__*/_jsx("span", {
+                  className: "text-[#a6a08c] text-[10px] font-normal",
                   children: " /100"
                 })]
               })]
             }), /*#__PURE__*/_jsxs("div", {
-              className: "text-[11px] text-zinc-500",
-              children: [day.detail.quality, " \xB7 ", day.detail.duration, " \xB7 ", day.detail.bedtime, "–", day.detail.wakeTime]
+              className: "text-[11px] text-[#948d78]",
+              children: [day.detail.quality, " \xB7 ", day.detail.duration, " \xB7 ", day.detail.bedtime, "â", day.detail.wakeTime]
             }), /*#__PURE__*/_jsxs("div", {
-              className: "flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-zinc-600 mt-1",
+              className: "flex flex-wrap gap-x-3 gap-y-0.5 text-[10px] text-[#a6a08c] mt-1",
               children: [/*#__PURE__*/_jsxs("span", {
                 children: ["RHR ", day.detail.restingHR]
               }), /*#__PURE__*/_jsxs("span", {
@@ -3583,10 +3583,10 @@ function SleepTab({
           }) : /*#__PURE__*/_jsxs("div", {
             className: "flex items-center justify-between",
             children: [/*#__PURE__*/_jsx("span", {
-              className: `text-xs font-medium ${day.isToday ? "text-zinc-200" : "text-zinc-400"}`,
+              className: `text-xs font-medium ${day.isToday ? "text-black" : "text-[#8a8370]"}`,
               children: day.label
             }), /*#__PURE__*/_jsx("span", {
-              className: "text-[11px] text-zinc-600",
+              className: "text-[11px] text-[#a6a08c]",
               children: day.score != null ? `Score ${day.score} \xB7 detail not synced` : "No data"
             })]
           })
@@ -3596,7 +3596,7 @@ function SleepTab({
   });
 }
 
-// One bar per day of the selected week. Handles missing data honestly — a day with no
+// One bar per day of the selected week. Handles missing data honestly â a day with no
 // synced value for this metric shows a dashed baseline instead of a fabricated zero bar.
 // Builds a smooth SVG path through a set of points, skipping gaps where value is null
 // (splits into separate path segments rather than drawing a misleading line across
@@ -3633,7 +3633,7 @@ function smoothPathSegments(coords) {
 }
 
 // One chart, one or more series sharing an x-axis (days of the week) and a single
-// y-scale — only combine series here when their units are genuinely comparable
+// y-scale â only combine series here when their units are genuinely comparable
 // (e.g. kg with kg), otherwise a shared scale visually distorts the smaller-range one.
 function WeekLineChart({
   title,
@@ -3656,21 +3656,21 @@ function WeekLineChart({
   };
 
   // When every series is toggled off, fall back to showing all of them rather than an
-  // empty chart — that state is confusing, not useful.
+  // empty chart â that state is confusing, not useful.
   const visibleSeries = series.length > 1 && series.some(s => !hidden.has(s.key)) ? series.filter(s => !hidden.has(s.key)) : series;
   const allVals = visibleSeries.flatMap(s => points.map(p => p.values[s.key]).filter(v => v != null));
   const max = allVals.length ? Math.max(...allVals) : 1;
   const min = allVals.length ? Math.min(...allVals) : 0;
   const range = max - min || 1;
 
-  // No horizontal padding here on purpose — dot i sits at exactly i/(n-1) of the width,
+  // No horizontal padding here on purpose â dot i sits at exactly i/(n-1) of the width,
   // the same fraction the day-label row (justify-between), the hover zones (7 equal
   // flex-1 slices), and the tooltip's left:% all use. Padding this differently from
   // those was one earlier bug: dots visually drifted from their labels, and hovering
   // near a real dot could resolve to a neighboring (sometimes empty) day instead.
   // A second, separate bug lived in the <svg> tag itself: without preserveAspectRatio="none",
   // the browser defaults to centering the viewBox with letterbox margins whenever the
-  // rendered box's aspect ratio doesn't match the viewBox's — which is exactly what a wide
+  // rendered box's aspect ratio doesn't match the viewBox's â which is exactly what a wide
   // desktop card does (this stayed invisible on narrow mobile widths, where the aspect
   // ratios happen to be close enough that the margin was too small to notice).
   const stepX = width / (points.length - 1);
@@ -3683,7 +3683,7 @@ function WeekLineChart({
       children: [/*#__PURE__*/_jsxs("div", {
         className: "flex items-center gap-3",
         children: [/*#__PURE__*/_jsx("span", {
-          className: "text-[11px] uppercase tracking-wide text-zinc-500",
+          className: "text-[11px] uppercase tracking-wide text-[#948d78]",
           children: title
         }), series.length > 1 && /*#__PURE__*/_jsx("div", {
           className: "flex items-center gap-2",
@@ -3691,7 +3691,7 @@ function WeekLineChart({
             const isHidden = hidden.has(s.key) && visibleSeries.length < series.length;
             return /*#__PURE__*/_jsxs("button", {
               onClick: () => toggleSeries(s.key),
-              className: `flex items-center gap-1 text-[10px] transition-opacity ${isHidden ? "text-zinc-700 opacity-50" : "text-zinc-500"}`,
+              className: `flex items-center gap-1 text-[10px] transition-opacity ${isHidden ? "text-[#b8b19c] opacity-50" : "text-[#948d78]"}`,
               title: isHidden ? `Show ${s.label}` : `Hide ${s.label}`,
               children: [/*#__PURE__*/_jsx("span", {
                 className: "w-2 h-2 rounded-full inline-block",
@@ -3704,11 +3704,11 @@ function WeekLineChart({
           })
         })]
       }), unit && /*#__PURE__*/_jsx("span", {
-        className: "text-[10px] text-zinc-600",
+        className: "text-[10px] text-[#a6a08c]",
         children: unit
       })]
     }), !hasAnyData ? /*#__PURE__*/_jsx("div", {
-      className: "h-24 flex items-center justify-center text-[11px] text-zinc-600 border border-dashed border-zinc-800 rounded-lg",
+      className: "h-24 flex items-center justify-center text-[11px] text-[#a6a08c] border border-dashed border-[#ddd6c5] rounded-lg",
       children: "No data yet this week"
     }) : /*#__PURE__*/_jsxs("div", {
       className: "relative",
@@ -3756,34 +3756,34 @@ function WeekLineChart({
           onMouseLeave: () => setHoverIdx(null)
         }, i))
       }), hoverIdx !== null && /*#__PURE__*/_jsxs("div", {
-        className: "absolute top-0 bg-zinc-950 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-[11px] shadow-lg pointer-events-none z-10 whitespace-nowrap",
+        className: "absolute top-0 bg-[#f6f3ea] border border-[#ddd6c5] rounded-lg px-2.5 py-1.5 text-[11px] shadow-lg pointer-events-none z-10 whitespace-nowrap",
         style: {
           left: `${hoverIdx / (points.length - 1) * 100}%`,
           transform: `translateX(${hoverIdx === 0 ? "0%" : hoverIdx === points.length - 1 ? "-100%" : "-50%"})`
         },
         children: [/*#__PURE__*/_jsx("div", {
-          className: "text-zinc-500 mb-0.5",
+          className: "text-[#948d78] mb-0.5",
           children: points[hoverIdx].label
         }), visibleSeries.map(s => /*#__PURE__*/_jsxs("div", {
-          className: "flex items-center gap-1.5 text-zinc-200",
+          className: "flex items-center gap-1.5 text-black",
           children: [/*#__PURE__*/_jsx("span", {
             className: "w-1.5 h-1.5 rounded-full inline-block flex-shrink-0",
             style: {
               backgroundColor: s.color
             }
           }), visibleSeries.length > 1 && /*#__PURE__*/_jsxs("span", {
-            className: "text-zinc-500",
+            className: "text-[#948d78]",
             children: [s.label, ":"]
           }), /*#__PURE__*/_jsxs("span", {
             className: "font-mono",
-            children: [points[hoverIdx].values[s.key] != null ? points[hoverIdx].values[s.key] : "—", unit ? ` ${unit}` : ""]
+            children: [points[hoverIdx].values[s.key] != null ? points[hoverIdx].values[s.key] : "â", unit ? ` ${unit}` : ""]
           })]
         }, s.key))]
       })]
     }), /*#__PURE__*/_jsx("div", {
-      className: "flex justify-between text-[9px] text-zinc-600 mt-1",
+      className: "flex justify-between text-[9px] text-[#a6a08c] mt-1",
       children: points.map((p, i) => /*#__PURE__*/_jsx("span", {
-        className: p.isToday ? "text-zinc-200 font-bold" : "",
+        className: p.isToday ? "text-black font-bold" : "",
         children: p.label
       }, i))
     })]
@@ -3812,7 +3812,7 @@ function TrendsTab({
   const weekLabel = `${weekDates[0].toLocaleDateString("default", {
     month: "short",
     day: "numeric"
-  })} – ${weekDates[6].toLocaleDateString("default", {
+  })} â ${weekDates[6].toLocaleDateString("default", {
     month: "short",
     day: "numeric",
     year: "numeric"
@@ -3879,24 +3879,24 @@ function TrendsTab({
   return /*#__PURE__*/_jsxs("div", {
     className: "flex flex-col gap-6",
     children: [/*#__PURE__*/_jsxs("div", {
-      className: "flex items-center justify-between bg-zinc-900 rounded-xl px-4 py-3 border border-zinc-800",
+      className: "flex items-center justify-between bg-[#f6f3ea] rounded-xl px-4 py-3 border border-[#ddd6c5]",
       children: [/*#__PURE__*/_jsx("button", {
         onClick: () => setWeekOffset(o => o - 1),
-        className: "text-zinc-400 hover:text-zinc-200 px-2 py-1 text-sm",
+        className: "text-[#8a8370] hover:text-black px-2 py-1 text-sm",
         children: "\u2039 Prev"
       }), /*#__PURE__*/_jsx("span", {
-        className: "text-sm font-semibold text-zinc-200",
+        className: "text-sm font-semibold text-black",
         children: weekLabel
       }), /*#__PURE__*/_jsx("button", {
         onClick: () => setWeekOffset(o => Math.min(0, o + 1)),
         disabled: weekOffset >= 0,
-        className: "text-zinc-400 hover:text-zinc-200 disabled:text-zinc-700 disabled:cursor-default px-2 py-1 text-sm",
+        className: "text-[#8a8370] hover:text-black disabled:text-[#b8b19c] disabled:cursor-default px-2 py-1 text-sm",
         children: "Next \u203A"
       })]
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5] flex flex-col gap-6",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-sm font-semibold text-zinc-200",
+        className: "text-sm font-semibold text-black",
         children: "Body Composition"
       }), /*#__PURE__*/_jsx(WeekLineChart, {
         title: "Weight & Skeletal Muscle",
@@ -3908,7 +3908,7 @@ function TrendsTab({
         }, {
           key: "muscle",
           label: "Muscle",
-          color: "#e879f9"
+          color: "#D97706"
         }],
         points: weightMusclePoints
       }), /*#__PURE__*/_jsx(WeekLineChart, {
@@ -3922,9 +3922,9 @@ function TrendsTab({
         points: bodyFatPoints
       })]
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5] flex flex-col gap-6",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-sm font-semibold text-zinc-200",
+        className: "text-sm font-semibold text-black",
         children: "Sleep"
       }), /*#__PURE__*/_jsx(WeekLineChart, {
         title: "Duration",
@@ -3946,12 +3946,12 @@ function TrendsTab({
         points: stressPoints
       })]
     }), /*#__PURE__*/_jsxs("div", {
-      className: "bg-zinc-900 rounded-xl p-4 border border-zinc-800 flex flex-col gap-6",
+      className: "bg-[#f6f3ea] rounded-xl p-4 border border-[#ddd6c5] flex flex-col gap-6",
       children: [/*#__PURE__*/_jsx("span", {
-        className: "text-sm font-semibold text-zinc-200",
+        className: "text-sm font-semibold text-black",
         children: "Nutrition"
       }), /*#__PURE__*/_jsx("span", {
-        className: "text-[11px] text-zinc-600 -mt-4",
+        className: "text-[11px] text-[#a6a08c] -mt-4",
         children: "Calories consumed are synced directly; macro grams are estimated from each meal's calories and macro %."
       }), /*#__PURE__*/_jsx(WeekLineChart, {
         title: "Calories",
@@ -3972,11 +3972,11 @@ function TrendsTab({
         }, {
           key: "carbs",
           label: "Carbs",
-          color: "#fbbf24"
+          color: "#0EA5E9"
         }, {
           key: "fat",
           label: "Fat",
-          color: "#f87171"
+          color: "#8B5CF6"
         }],
         points: macroPoints
       })]
@@ -4006,7 +4006,7 @@ export default function HealthDashboard() {
   const paramSaveTimer = useRef(null);
 
   // Workout-specific manual entries (pace, distance, set counts you choose per session).
-  // Synced through the shared backend like everything else — debounced (waits 800ms after
+  // Synced through the shared backend like everything else â debounced (waits 800ms after
   // the last keystroke) so typing a pace doesn't fire a network request per character.
   const handleParamChange = (system, day, key, val) => {
     setWorkoutParams(prev => {
@@ -4037,12 +4037,12 @@ export default function HealthDashboard() {
     });
   };
 
-  // Loads everything from the shared backend on page open — including healthData, so a
+  // Loads everything from the shared backend on page open â including healthData, so a
   // fresh Garmin/MyFitnessPal pull (from Cowork or a live chat pull) shows up automatically
   // the moment the dashboard is opened, with no button press needed. This is a read-only
-  // GET, so it's safe to run unconditionally on every mount — the earlier data-loss bug was
+  // GET, so it's safe to run unconditionally on every mount â the earlier data-loss bug was
   // about auto-WRITEs firing before real data loaded, not about reads. backendLoaded only
-  // flips true once this finishes (success OR failure) — nothing is allowed to write to the
+  // flips true once this finishes (success OR failure) â nothing is allowed to write to the
   // backend before that, which is what closes that original race.
   useEffect(() => {
     (async () => {
@@ -4065,7 +4065,7 @@ export default function HealthDashboard() {
 
   // Whenever a Garmin/MyFitnessPal pull lands (healthData changes), fold its sleep,
   // stress, and nutrition numbers into logsByDate under whichever real date that data
-  // was for — this is what lets the calendar (and Trends chart) show that data without
+  // was for â this is what lets the calendar (and Trends chart) show that data without
   // a separate manual log step. Guarded by backendLoaded so this can never fire before
   // real saved data has loaded.
   useEffect(() => {
@@ -4129,7 +4129,7 @@ export default function HealthDashboard() {
 
   // Single handler for the Workout tab's Log button. logDate is the date the person picked
   // in the inline date-picker (or null when un-logging). Computes the per-day checkbox state
-  // AND the calendar's date-keyed record together, then saves both in one combined write —
+  // AND the calendar's date-keyed record together, then saves both in one combined write â
   // two separate writes here would race each other and could silently drop one.
   const handleToggleLog = async (system, day, logDate) => {
     const workout = SYSTEMS[system]?.workouts?.[SYSTEMS[system].type === "weekly" ? SYSTEMS[system].schedule[day] : day];
@@ -4137,7 +4137,7 @@ export default function HealthDashboard() {
       ...logsByDate
     };
 
-    // Always adds to whatever's already logged for that date — never replaces an existing
+    // Always adds to whatever's already logged for that date â never replaces an existing
     // entry, so logging a 2nd (or 3rd) workout the same day keeps all of them.
     const existing = nextLogsByDate[logDate]?.workouts || [];
     nextLogsByDate[logDate] = {
@@ -4163,7 +4163,7 @@ export default function HealthDashboard() {
   };
 
   // Removes one specific logged workout from a given calendar date (from the Overview
-  // calendar's delete button) — leaves any other workouts logged that same day untouched.
+  // calendar's delete button) â leaves any other workouts logged that same day untouched.
   const handleDeleteWorkout = async (date, index) => {
     const nextLogsByDate = {
       ...logsByDate
@@ -4192,7 +4192,7 @@ export default function HealthDashboard() {
     setSyncError(null);
     try {
       const remote = await fetchBackendState();
-      if (!remote.healthData) throw new Error("No synced Garmin/MyFitnessPal data yet — ask Claude to pull it live first.");
+      if (!remote.healthData) throw new Error("No synced Garmin/MyFitnessPal data yet â ask Claude to pull it live first.");
       setHealthData(remote.healthData);
     } catch (e) {
       setSyncError(e.message || "Sync failed.");
@@ -4200,17 +4200,17 @@ export default function HealthDashboard() {
       setSyncing(false);
     }
   };
-  const sleepScore = healthData?.["Sleep Score"] ?? "—";
-  const stressScore = healthData?.["Stress Score"] ?? "—";
+  const sleepScore = healthData?.["Sleep Score"] ?? "â";
+  const stressScore = healthData?.["Stress Score"] ?? "â";
   const backendStatusLabel = {
-    loading: "Loading synced data…",
+    loading: "Loading synced dataâ¦",
     ready: "",
-    saving: "Saving…",
+    saving: "Savingâ¦",
     saved: "Saved",
-    error: backendError || "Sync error — changes are only saved on this device right now"
+    error: backendError || "Sync error â changes are only saved on this device right now"
   }[backendStatus];
   return /*#__PURE__*/_jsx("div", {
-    className: "min-h-screen bg-zinc-950 text-zinc-50 p-4 sm:p-6",
+    className: "min-h-screen bg-[#ede8dc] text-black p-4 sm:p-6",
     children: /*#__PURE__*/_jsxs("div", {
       className: "max-w-2xl mx-auto flex flex-col gap-5",
       children: [/*#__PURE__*/_jsxs("header", {
@@ -4219,20 +4219,20 @@ export default function HealthDashboard() {
           className: "text-lg font-bold tracking-tight",
           children: "RVSH Health Dashboard"
         }), /*#__PURE__*/_jsx("p", {
-          className: "text-xs text-orange-300 italic",
+          className: "text-xs text-[#D9838C] italic",
           children: healthData?.motivationalMessage || "Your daily motivation lands here once Cowork's next sync runs."
         }), backendStatusLabel && /*#__PURE__*/_jsx("p", {
-          className: `text-[11px] mt-0.5 ${backendStatus === "error" ? "text-red-400" : "text-zinc-600"}`,
+          className: `text-[11px] mt-0.5 ${backendStatus === "error" ? "text-[#dc2626]" : "text-[#a6a08c]"}`,
           children: backendStatusLabel
         })]
       }), /*#__PURE__*/_jsx("nav", {
-        className: "grid grid-cols-5 gap-1 bg-zinc-900 rounded-xl p-1 border border-zinc-800",
+        className: "grid grid-cols-5 gap-1 bg-[#f6f3ea] rounded-xl p-1 border border-[#ddd6c5]",
         children: TABS.map(t => {
           const Icon = t.icon;
           const active = tab === t.id;
           return /*#__PURE__*/_jsxs("button", {
             onClick: () => setTab(t.id),
-            className: `flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors ${active ? "bg-zinc-800 text-lime-400" : "text-zinc-500 hover:text-zinc-300"}`,
+            className: `flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] font-medium transition-colors ${active ? "bg-[#ddd6c5] text-[#B8860B]" : "text-[#948d78] hover:text-black"}`,
             children: [/*#__PURE__*/_jsx(Icon, {
               className: "w-4 h-4"
             }), t.label]
